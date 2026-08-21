@@ -13,6 +13,7 @@ import java.util.Map;
 public final class BuildingMarkerRegistry {
     public static final String FUNCTION_WAREHOUSE = BuildingFunction.WAREHOUSE.id();
     public static final String FUNCTION_RESIDENCE = BuildingFunction.RESIDENCE.id();
+    public static final String FUNCTION_TOWN_HALL = BuildingFunction.TOWN_HALL.id();
     public static final String FUNCTION_UNKNOWN = "unknown";
 
     private static final Map<Item, MarkerDefinition> DEFINITIONS = new IdentityHashMap<>();
@@ -29,8 +30,11 @@ public final class BuildingMarkerRegistry {
                 new MarkerDefinition(BuildingFunction.RESIDENCE, 2));
         DEFINITIONS.put(CivilizationItems.RESIDENTIAL_MARKER_4,
                 new MarkerDefinition(BuildingFunction.RESIDENCE, 4));
-        DEFINITIONS.put(CivilizationItems.RESIDENTIAL_MARKER_6,
+                DEFINITIONS.put(CivilizationItems.RESIDENTIAL_MARKER_6,
                 new MarkerDefinition(BuildingFunction.RESIDENCE, 6));
+        DEFINITIONS.put(CivilizationItems.TOWN_HALL_MARKER,
+                new MarkerDefinition(BuildingFunction.TOWN_HALL, 0));
+
     }
 
     public static MarkerDefinition definition(ItemStack stack) {
@@ -40,9 +44,18 @@ public final class BuildingMarkerRegistry {
         return DEFINITIONS.get(stack.getItem());
     }
 
-    public static boolean isKnownMarker(ItemStack stack) {
+        public static boolean isKnownMarker(ItemStack stack) {
         return definition(stack) != null;
     }
+
+    public static boolean isTerritoryMarker(ItemStack stack) {
+        MarkerDefinition marker = definition(stack);
+        return marker != null
+                && (marker.function() == BuildingFunction.WAREHOUSE
+                || marker.function() == BuildingFunction.RESIDENCE);
+    }
+
+
 
     public static String functionId(ItemStack stack) {
         MarkerDefinition definition = definition(stack);

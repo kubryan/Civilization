@@ -398,3 +398,22 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：移除 `civilizationmod.building.selection.cancelled` stale locale key，並新增 regression 確認 pending A 在 ItemStack copy 後仍可完成 territory。
 - 禁止：不要再用目前手持物或 equipment slot 自動推導玩家是否要取消選點。
 - 查證：`CivitasBuildingMarkerItem.java`、`WarehouseTerritory.java`、`FoodModelRegressionTest.java`；日期 2026-08-21。
+
+
+## 2026-08-21 — 市政廳核心 SavedData 與 ItemFrame API 查證
+
+- 已確認：Minecraft 26.2 common jar 的 `ServerLevel.getDataStorage()` 回傳 `net.minecraft.world.level.storage.SavedDataStorage`；`SavedDataStorage.computeIfAbsent(SavedDataType<T>)` 可取得或建立 Codec-backed SavedData。
+- 已確認：`SavedDataType<T>` 建構子為 `SavedDataType(Identifier, Supplier<T>, Codec<T>, DataFixTypes)`；現有 `CivilizationWorldData.TYPE` 的 `null` data fixer 寫法與實際 mapping 相容。
+- 已確認：26.2 ItemFrame 公開 `getItem()`、`setItem(ItemStack)`／`setItem(ItemStack, boolean)`；ItemFrame 的 `blockPosition()`、`getDirection()` 由既有 `HangingEntity`／Entity API 提供，專案 geometry reference 已查證 frame 支撐位置為 `frame.blockPosition().relative(frame.getDirection().getOpposite())`。
+- 採用：市政廳核心資料放入既有 overworld-scoped `CivilizationWorldData`，由 Codec optional field 保存，修改後呼叫 `setDirty()`；不建立 client-only state 或未查證 ItemFrame event。
+- 查證：本機 `C:\Program Files\Java\jdk-25.0.2\bin\javap.exe` 對 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`；Fabric Saved Data 官方文件 https://docs.fabricmc.net/develop/saved-data；日期 2026-08-21。
+
+
+## 2026-08-21 — 市政廳核心辨識與 SavedData
+
+- 採用 `BuildingFunction.TOWN_HALL` 與 `BuildingMarkerRegistry` metadata；`town_hall_marker` 成為 building scanner 可辨識 marker，但 `CivitasBuildingMarkerItem` 與 `WarehouseMarkerQuickDeploy` 只接受 warehouse／residence territory marker，避免市政廳誤觸發兩點選取或 warehouse 快速放置。
+- 新增 `TownHallCore` common record，保存 `colony_id`、`dimension`、marker 座標、`created_at` 與 `radius`。核心資料放在既有 `CivilizationWorldData` 的 optional `town_halls` Codec list，schema version 由 6 升為 7；舊世界缺少欄位時使用空 list。
+- 第一版唯一性規則為每個維度一座 Town Hall；同一 marker 重掃回傳 `EXISTING` 且不改變建立時間，不同 marker 同維度回傳 `DUPLICATE`，不同維度可註冊另一座核心。初始 radius 為 64，保存在 core 資料中供後續殖民地範圍使用。
+- `TownHallValidator` 只要求 server 已載入且 ItemFrame 以已查證支撐牆公式附著；不套用 warehouse／residence 的門、地板、屋頂、牆體或床位規則。第二座同維度 marker 仍保留 BuildingObservation，但以 `duplicate_town_hall` 標為 invalid。
+- `/civitas townhall` 與 `/civilization townhall` 無參數查詢已保存核心；`building scan` 額外顯示新增核心與衝突數量。所有命令使用共用 handler 與 locale。
+- 查證與驗證：26.2 common jar javap、Fabric Saved Data 官方文件、`runFoodModelRegressionTest`（含 TownHallCore Codec／唯一性測試）與 `build`；日期 2026-08-21。

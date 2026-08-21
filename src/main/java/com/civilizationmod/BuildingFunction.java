@@ -5,7 +5,8 @@ import java.util.Arrays;
 /** Stable logical functions that can be activated by building marker items. */
 public enum BuildingFunction {
     WAREHOUSE("warehouse"),
-    RESIDENCE("residence");
+    RESIDENCE("residence"),
+    TOWN_HALL("town_hall");
 
     private final String id;
 

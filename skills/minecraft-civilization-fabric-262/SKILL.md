@@ -493,3 +493,23 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 新的資料生命週期是：左鍵寫入 pending A；右鍵同維度 B 成功後轉為 completed territory；右鍵不同維度時仍由 `WarehouseTerritory.complete(...)` 清除不相容的 pending selection 並回傳 `DIFFERENT_DIMENSION`；過大範圍仍保留 pending A，讓玩家可重新選 B。切換物品不再是取消條件，舊的 `civilizationmod.building.selection.cancelled` 玩家文案同步移除。
 
 採用：回歸測試鎖定 pending A 可在 marker stack copy 後保留，並可成功完成 territory。不要讓 inventory tick 依目前 equipment slot 推導選點資料生命週期。
+
+
+## 已查證：市政廳核心 SavedData 與 ItemFrame API（2026-08-21）
+
+本機 Minecraft 26.2 common jar 的 javap 確認 `ServerLevel.getDataStorage()` 回傳 `net.minecraft.world.level.storage.SavedDataStorage`，其公開 `computeIfAbsent(SavedDataType<T>)` 可取得或建立 Codec-backed SavedData；`SavedDataType<T>` 建構子為 `SavedDataType(Identifier, Supplier<T>, Codec<T>, DataFixTypes)`。因此市政廳核心先放入既有 overworld-scoped `CivilizationWorldData`，以 Codec optional field 保存，資料修改後呼叫 `setDirty()`。
+
+同一 jar 與專案 geometry reference 確認 ItemFrame 可使用 `getItem()`、`setItem(ItemStack)`／`setItem(ItemStack, boolean)`，以及繼承的 `blockPosition()`、`getDirection()`；支撐牆位置使用 `frame.blockPosition().relative(frame.getDirection().getOpposite())`。市政廳辨識採既有 server-side `Level.getEntities(EntityTypeTest.forClass(ItemFrame.class), AABB, predicate)` 掃描，不建立未查證的 ItemFrame 專用事件。
+
+查證來源：本機 javap 與 Fabric Saved Data 官方文件 https://docs.fabricmc.net/develop/saved-data；日期 2026-08-21。
+
+
+## 已採用：市政廳核心辨識與 SavedData（2026-08-21）
+
+市政廳第一版加入 `BuildingFunction.TOWN_HALL` 與 `BuildingMarkerRegistry` metadata，使 `town_hall_marker` 能由既有 server building scanner 辨識。共用兩點 territory 選取與 warehouse 快速放置只接受 warehouse／residence marker，不得因市政廳成為 known marker 而誤觸發。
+
+新增 `TownHallCore` common record，保存 `colony_id`、`dimension`、marker 座標、`created_at` 與 `radius`。核心資料寫入既有 `CivilizationWorldData` 的 optional `town_halls` Codec list，`schema_version` 由 6 升至 7；舊世界未含此欄位時載入空清單。第一版每個維度只允許一座核心：同一 marker 重掃為 `EXISTING`，不改建立時間；同維度不同 marker 為 `DUPLICATE`；不同維度可建立另一核心。固定初始 radius 為 64，保存在 core 資料中供後續殖民地範圍使用。
+
+`TownHallValidator` 只要求 server 已載入且 ItemFrame 透過既有支撐牆公式附著，不套用 warehouse／residence 的門、地板、屋頂、牆體或床位規則。重複核心仍保存 BuildingObservation，但以 `duplicate_town_hall` 受控 reason 標記 invalid。`/civitas townhall` 與相容別名可查詢保存核心；`building scan` 額外回報新增核心與衝突數量。
+
+驗證包含 26.2 common jar javap、Fabric Saved Data 官方文件、TownHallCore Codec／唯一性純 Java regression、Java 25 compile/build、client smoke test 與 dedicated server 初始化；日期 2026-08-21。

@@ -22,7 +22,10 @@
   "civilizationmod.command.scan.refreshed": "已重新觀測村莊：%1$d、%2$d、%3$d（%4$s），目前觀測人口=%5$d",
   "civilizationmod.command.building.none": "目前沒有已觀測的建築標識。",
   "civilizationmod.command.building.invalid": "建築編號 %1$d 無效。目前已觀測建築：%2$d 座。",
-  "civilizationmod.command.building.scan.result": "建築掃描半徑 %1$d：偵測到 %2$d 個，更新 %3$d 個，已綁定聚落 %4$d 個，有效=%5$d 個，無效=%6$d 個。",
+    "civilizationmod.command.building.scan.result": "建築掃描半徑 %1$d：偵測到 %2$d 個，更新 %3$d 個，已綁定聚落 %4$d 個，有效=%5$d 個，無效=%6$d 個，新增市政廳核心=%7$d 個，市政廳衝突=%8$d 個。",
+  "civilizationmod.command.town_hall.none": "目前沒有已登記的市政廳核心。",
+  "civilizationmod.command.town_hall.entry": "市政廳核心：殖民地 ID=%1$s，維度=%2$s，標誌位置=（%3$d，%4$d，%5$d），建立時間=%6$d，範圍半徑=%7$d。",
+
   "civilizationmod.command.building.entry": "建築 #%1$d：功能=%2$s，標識位置=%3$s（%4$d，%5$d，%6$d），聚落=%7$s，綁定=%8$s，驗證=%9$s，原因=%10$s，指派村民=%11$s，住宅資料=%12$s，首次觀測=%13$d，最近觀測=%14$d，儲存=%15$s",
   "civilizationmod.command.assign.invalid_building": "建築編號 %1$d 無效。目前已觀測建築：%2$d 座。",
     "civilizationmod.command.assign.building_not_valid": "建築 #%1$d 目前不是有效建築，不能指派村民（%2$s）。",
@@ -44,7 +47,9 @@
   "civilizationmod.command.building.generate.result": "已生成測試倉庫：門口=（%1$d，%2$d，%3$d），標識=（%4$d，%5$d，%6$d）。請執行 /civitas building scan 進行驗證。",
   "civilizationmod.command.building.generate.failed": "無法生成測試倉庫：%1$s",
   "civilizationmod.building.function.warehouse": "倉庫",
-  "civilizationmod.building.function.residence": "住宅",
+    "civilizationmod.building.function.residence": "住宅",
+  "civilizationmod.building.function.town_hall": "市政廳",
+
   "civilizationmod.building.function.unknown": "未知",
   "civilizationmod.building.status.bound": "已綁定",
   "civilizationmod.building.status.unbound": "未綁定",
@@ -68,7 +73,9 @@
   "civilizationmod.command.building.generate.failure.existing_item_frame": "測試範圍內已經有物品展示框",
   "civilizationmod.command.building.generate.failure.frame_invalid": "生成的倉庫標識物品展示框無法附著在牆上",
   "civilizationmod.command.building.generate.failure.entity_spawn_failed": "生成的倉庫標識物品展示框無法加入世界",
-  "civilizationmod.building.validation.reason.marker_not_at_door": "標識不在門附近",
+    "civilizationmod.building.validation.reason.marker_not_at_door": "標識不在門附近",
+  "civilizationmod.building.validation.reason.duplicate_town_hall": "這個維度已經存在另一座市政廳",
+
   "civilizationmod.building.validation.reason.marker_ambiguous": "門附近有多於一個合法標識",
   "civilizationmod.building.validation.reason.scan_limit": "幾何掃描已達上限",
   "civilizationmod.building.validation.reason.no_context": "缺少驗證上下文",

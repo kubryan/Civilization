@@ -67,6 +67,7 @@ public record BuildingObservation(
     public static final String VALIDATION_REASON_MARKER_OUTSIDE_TERRITORY = "marker_outside_territory";
     public static final String VALIDATION_REASON_MARKER_NOT_ATTACHED = "marker_not_attached";
     public static final String VALIDATION_REASON_DUPLICATE_TERRITORY = "duplicate_territory";
+    public static final String VALIDATION_REASON_DUPLICATE_TOWN_HALL = "duplicate_town_hall";
 
     /** Persisted resident identity; UUID is authoritative and name is diagnostic. */
     public record ResidentAssignment(String uuid, String name) {

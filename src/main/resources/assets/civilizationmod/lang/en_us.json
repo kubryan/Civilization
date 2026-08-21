@@ -22,7 +22,10 @@
   "civilizationmod.command.scan.refreshed": "Refreshed village at %1$d, %2$d, %3$d in %4$s: observed population=%5$d",
   "civilizationmod.command.building.none": "No building markers have been observed.",
   "civilizationmod.command.building.invalid": "Building index %1$d is invalid. Observed buildings: %2$d.",
-  "civilizationmod.command.building.scan.result": "Building scan radius %1$d: detected=%2$d, updated=%3$d, bound=%4$d, valid=%5$d, invalid=%6$d.",
+    "civilizationmod.command.building.scan.result": "Building scan radius %1$d: detected=%2$d, updated=%3$d, bound=%4$d, valid=%5$d, invalid=%6$d, town halls registered=%7$d, town hall conflicts=%8$d.",
+  "civilizationmod.command.town_hall.none": "No Town Hall core is registered.",
+  "civilizationmod.command.town_hall.entry": "Town Hall core: colony_id=%1$s, dimension=%2$s, marker=(%3$d, %4$d, %5$d), created_at=%6$d, radius=%7$d.",
+
   "civilizationmod.command.building.entry": "Building #%1$d: function=%2$s, marker=%3$s (%4$d, %5$d, %6$d), settlement=%7$s, binding=%8$s, validation=%9$s, reason=%10$s, resident=%11$s, residence=%12$s, first_seen=%13$d, last_seen=%14$d, storage=%15$s",
   "civilizationmod.command.assign.invalid_building": "Building index %1$d is invalid. Observed buildings: %2$d.",
     "civilizationmod.command.assign.building_not_valid": "Building #%1$d cannot receive a villager because it is not valid (%2$s).",
@@ -44,7 +47,9 @@
   "civilizationmod.command.building.generate.result": "Generated test warehouse: door=(%1$d, %2$d, %3$d), marker=(%4$d, %5$d, %6$d). Run /civitas building scan to validate it.",
   "civilizationmod.command.building.generate.failed": "Could not generate test warehouse: %1$s",
   "civilizationmod.building.function.warehouse": "warehouse",
-  "civilizationmod.building.function.residence": "residence",
+    "civilizationmod.building.function.residence": "residence",
+  "civilizationmod.building.function.town_hall": "town hall",
+
   "civilizationmod.building.function.unknown": "unknown",
   "civilizationmod.building.status.bound": "bound",
   "civilizationmod.building.status.unbound": "unbound",
@@ -68,7 +73,9 @@
   "civilizationmod.command.building.generate.failure.existing_item_frame": "an ItemFrame already exists in the test area",
   "civilizationmod.command.building.generate.failure.frame_invalid": "the generated Marker ItemFrame could not attach to the wall",
   "civilizationmod.command.building.generate.failure.entity_spawn_failed": "the generated Marker ItemFrame could not be added to the world",
-  "civilizationmod.building.validation.reason.marker_not_at_door": "marker is not near a door",
+    "civilizationmod.building.validation.reason.marker_not_at_door": "marker is not near a door",
+  "civilizationmod.building.validation.reason.duplicate_town_hall": "another Town Hall already exists in this dimension",
+
   "civilizationmod.building.validation.reason.marker_ambiguous": "more than one legal marker is near the door",
   "civilizationmod.building.validation.reason.scan_limit": "geometry scan limit reached",
   "civilizationmod.building.validation.reason.no_context": "missing validation context",

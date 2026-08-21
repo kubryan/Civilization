@@ -138,7 +138,7 @@ public final class BuildingGeometryValidator {
                     SideScan.empty("territory"));
         }
 
-        if (markerFrame != null && BuildingFunction.RESIDENCE.id().equals(functionId)) {
+                if (markerFrame != null && BuildingFunction.RESIDENCE.id().equals(functionId)) {
             int capacity = BuildingMarkerRegistry.capacity(markerFrame.getItem());
             ResidenceValidator.Validation residence = ResidenceValidator.validate(level, markerFrame, capacity);
             return diagnostic(
@@ -156,6 +156,26 @@ public final class BuildingGeometryValidator {
                             residence.bedCount()),
                     SideScan.empty("residence"));
         }
+
+        if (BuildingFunction.TOWN_HALL.id().equals(functionId)) {
+            TownHallValidator.Validation townHall = TownHallValidator.validate(level, markerFrame);
+            return diagnostic(
+                    markerPosition,
+                    null,
+                    null,
+                    "town_hall",
+                    townHall.markerAttached() ? 1 : 0,
+                    townHall.isValid(),
+                    new ValidationResult(
+                            townHall.status(),
+                            townHall.reason(),
+                            townHall.markerAttached() ? 1 : 0,
+                            townHall.markerAttached() ? 1 : 0,
+                            townHall.markerAttached() ? 1 : 0),
+                    SideScan.empty("town_hall"));
+        }
+
+
 
         DoorCandidate door = findNearestDoor(level, markerPosition);
         if (door == null) {

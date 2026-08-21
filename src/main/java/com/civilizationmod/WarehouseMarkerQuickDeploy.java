@@ -35,7 +35,9 @@ public final class WarehouseMarkerQuickDeploy {
                 || !(entity instanceof ItemFrame frame)
                 || frame.getItem() == null
                 || !frame.getItem().isEmpty()
-                || !BuildingMarkerRegistry.isKnownMarker(player.getItemInHand(hand))) {
+                                || !BuildingFunction.WAREHOUSE.id().equals(
+                BuildingMarkerRegistry.functionId(player.getItemInHand(hand)))) {
+
             return InteractionResult.PASS;
         }
 

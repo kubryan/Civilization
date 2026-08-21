@@ -26,7 +26,8 @@ import java.util.Set;
  * client.</p>
  */
 public final class CivilizationWorldData extends SavedData {
-    private static final int CURRENT_SCHEMA_VERSION = 6;
+        private static final int CURRENT_SCHEMA_VERSION = 7;
+
     private static final int BUILDING_BIND_HORIZONTAL_RADIUS = 128;
     private static final int BUILDING_BIND_VERTICAL_RADIUS = 64;
 
@@ -34,8 +35,10 @@ public final class CivilizationWorldData extends SavedData {
             Codec.INT.fieldOf("schema_version").forGetter(CivilizationWorldData::getSchemaVersion),
             Codec.LONG.fieldOf("simulation_steps").forGetter(CivilizationWorldData::getSimulationSteps),
             Codec.INT.fieldOf("settlement_count").forGetter(CivilizationWorldData::getSettlementCount),
-            SettlementAdapter.CODEC.listOf().optionalFieldOf("settlements", List.of()).forGetter(CivilizationWorldData::getSettlements),
-            BuildingObservation.CODEC.listOf().optionalFieldOf("buildings", List.of()).forGetter(CivilizationWorldData::getBuildings)
+                        SettlementAdapter.CODEC.listOf().optionalFieldOf("settlements", List.of()).forGetter(CivilizationWorldData::getSettlements),
+            BuildingObservation.CODEC.listOf().optionalFieldOf("buildings", List.of()).forGetter(CivilizationWorldData::getBuildings),
+            TownHallCore.CODEC.listOf().optionalFieldOf("town_halls", List.of()).forGetter(CivilizationWorldData::getTownHallCores)
+
     ).apply(instance, CivilizationWorldData::new));
 
     public static final SavedDataType<CivilizationWorldData> TYPE = new SavedDataType<>(
@@ -49,22 +52,26 @@ public final class CivilizationWorldData extends SavedData {
     private long simulationSteps;
     private final List<SettlementAdapter> settlements;
     private final List<BuildingObservation> buildings;
+    private final List<TownHallCore> townHallCores;
 
     public CivilizationWorldData() {
-        this(CURRENT_SCHEMA_VERSION, 0L, 0, List.of(), List.of());
+        this(CURRENT_SCHEMA_VERSION, 0L, 0, List.of(), List.of(), List.of());
     }
 
     private CivilizationWorldData(
             int schemaVersion,
             long simulationSteps,
-            int ignoredSettlementCount,
+                        int ignoredSettlementCount,
             List<SettlementAdapter> settlements,
-            List<BuildingObservation> buildings
+            List<BuildingObservation> buildings,
+            List<TownHallCore> townHallCores
     ) {
+
         this.schemaVersion = Math.max(schemaVersion, CURRENT_SCHEMA_VERSION);
         this.simulationSteps = Math.max(0L, simulationSteps);
         this.settlements = new ArrayList<>(settlements);
         this.buildings = new ArrayList<>(buildings);
+        this.townHallCores = new ArrayList<>(townHallCores);
     }
 
     public static CivilizationWorldData get(MinecraftServer server) {
@@ -75,9 +82,11 @@ public final class CivilizationWorldData extends SavedData {
         }
 
         CivilizationWorldData data = overworld.getDataStorage().computeIfAbsent(TYPE);
-        data.removeDuplicateSettlements();
+                data.removeDuplicateSettlements();
         data.removeDuplicateBuildings();
+        data.removeDuplicateTownHallCores();
         return data;
+
     }
 
     public int getSchemaVersion() {
@@ -139,12 +148,70 @@ public final class CivilizationWorldData extends SavedData {
         return this.buildings.size();
     }
 
-    public BuildingObservation getBuilding(int oneBasedIndex) {
+        public BuildingObservation getBuilding(int oneBasedIndex) {
         if (oneBasedIndex < 1 || oneBasedIndex > this.buildings.size()) {
             return null;
         }
         return this.buildings.get(oneBasedIndex - 1);
     }
+
+    public List<TownHallCore> getTownHallCores() {
+        return List.copyOf(this.townHallCores);
+    }
+
+    public int getTownHallCoreCount() {
+        return this.townHallCores.size();
+    }
+
+    public TownHallCore getTownHallCore(String dimension) {
+        if (dimension == null || dimension.isBlank()) {
+            return null;
+        }
+        return this.townHallCores.stream()
+                .filter(core -> dimension.equals(core.dimension()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public TownHallRegistration registerTownHall(
+            String dimension,
+            BlockPos markerPosition,
+            long observedAt
+    ) {
+        if (dimension == null || dimension.isBlank() || markerPosition == null) {
+            return new TownHallRegistration(TownHallRegistrationStatus.INVALID, null);
+        }
+
+        TownHallCore existingAtMarker = this.townHallCores.stream()
+                .filter(core -> core.isSameMarker(dimension, markerPosition))
+                .findFirst()
+                .orElse(null);
+        if (existingAtMarker != null) {
+            return new TownHallRegistration(TownHallRegistrationStatus.EXISTING, existingAtMarker);
+        }
+
+        TownHallCore existingInDimension = getTownHallCore(dimension);
+        if (existingInDimension != null) {
+            return new TownHallRegistration(TownHallRegistrationStatus.DUPLICATE, existingInDimension);
+        }
+
+        TownHallCore created = TownHallCore.create(dimension, markerPosition, observedAt);
+        this.townHallCores.add(created);
+        this.setDirty();
+        return new TownHallRegistration(TownHallRegistrationStatus.REGISTERED, created);
+    }
+
+    public record TownHallRegistration(TownHallRegistrationStatus status, TownHallCore core) {
+    }
+
+    public enum TownHallRegistrationStatus {
+        REGISTERED,
+        EXISTING,
+        DUPLICATE,
+        INVALID
+    }
+
+
 
         public BuildingObservation findBuilding(String dimension, int x, int y, int z) {
         return this.buildings.stream()
@@ -243,14 +310,18 @@ public final class CivilizationWorldData extends SavedData {
         return removed;
     }
 
-    public BuildingScanSummary scanBuildingMarkers(ServerLevel level, BlockPos origin, int radius, long observedAt) {
+        public BuildingScanSummary scanBuildingMarkers(ServerLevel level, BlockPos origin, int radius, long observedAt) {
         removeMissingBuildings(level);
+        removeMissingTownHallCores(level);
+
         String dimension = level.dimension().identifier().toString();
         List<BuildingMarkerScanner.MarkerCandidate> candidates = BuildingMarkerScanner.scan(level, origin, radius);
         int updated = 0;
         int bound = 0;
         int valid = 0;
         int invalid = 0;
+        int townHallsRegistered = 0;
+        int townHallConflicts = 0;
         Set<WarehouseTerritory> claimedTerritories = new HashSet<>();
 
         for (BuildingMarkerScanner.MarkerCandidate candidate : candidates) {
@@ -268,7 +339,7 @@ public final class CivilizationWorldData extends SavedData {
             int capacity = markerDefinition == null ? 0 : markerDefinition.capacity();
             int bedCount = 0;
             BuildingGeometryValidator.ValidationResult validation;
-            if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())) {
+                        if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())) {
                 ResidenceValidator.Validation residence = ResidenceValidator.validate(
                         level,
                         candidate.frame(),
@@ -286,6 +357,7 @@ public final class CivilizationWorldData extends SavedData {
                         candidate.frame(),
                         candidate.functionId());
             }
+
             boolean duplicateTerritory = validation.isValid()
                     && WarehouseTerritory.read(candidate.frame().getItem())
                     .map(territory -> !claimedTerritories.add(territory))
@@ -354,6 +426,25 @@ public final class CivilizationWorldData extends SavedData {
                 }
                         }
 
+            if (BuildingFunction.TOWN_HALL.id().equals(candidate.functionId())
+                    && validation.isValid()) {
+                TownHallRegistration registration = registerTownHall(dimension, position, observedAt);
+                if (registration.status() == TownHallRegistrationStatus.REGISTERED) {
+                    townHallsRegistered++;
+                } else if (registration.status() == TownHallRegistrationStatus.DUPLICATE) {
+                    townHallConflicts++;
+                    validation = new BuildingGeometryValidator.ValidationResult(
+                            BuildingObservation.VALIDATION_INVALID,
+                            BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL,
+                            0,
+                            0,
+                            0);
+                    observation = observation.withValidation(
+                            BuildingObservation.VALIDATION_INVALID,
+                            BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL);
+                }
+            }
+
             if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())
                     && observation.residentCount() > capacity
                     && BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
@@ -397,7 +488,15 @@ public final class CivilizationWorldData extends SavedData {
         if (updated > 0) {
             this.setDirty();
         }
-        return new BuildingScanSummary(candidates.size(), updated, bound, valid, invalid);
+                return new BuildingScanSummary(
+                candidates.size(),
+                updated,
+                bound,
+                valid,
+                invalid,
+                townHallsRegistered,
+                townHallConflicts);
+
     }
 
     SettlementAdapter findSettlementForBuilding(String dimension, int markerX, int markerY, int markerZ) {
@@ -450,7 +549,61 @@ public final class CivilizationWorldData extends SavedData {
         return removed;
     }
 
+        private int removeMissingTownHallCores(ServerLevel level) {
+        if (level == null) {
+            return 0;
+        }
+
+        String dimension = level.dimension().identifier().toString();
+        int removed = 0;
+        for (int index = this.townHallCores.size() - 1; index >= 0; index--) {
+            TownHallCore core = this.townHallCores.get(index);
+            if (!dimension.equals(core.dimension())) {
+                continue;
+            }
+
+            BlockPos marker = new BlockPos(core.markerX(), core.markerY(), core.markerZ());
+            if (!level.isLoaded(marker)) {
+                continue;
+            }
+
+            boolean markerPresent = !level.getEntities(
+                    EntityTypeTest.forClass(ItemFrame.class),
+                    new AABB(marker).inflate(0.5D),
+                    frame -> frame.blockPosition().equals(marker)
+                            && BuildingFunction.TOWN_HALL.id().equals(
+                            BuildingMarkerRegistry.functionId(frame.getItem()))
+            ).isEmpty();
+            if (!markerPresent) {
+                this.townHallCores.remove(index);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            this.setDirty();
+        }
+        return removed;
+    }
+
+    private int removeDuplicateTownHallCores() {
+        Set<String> dimensions = new HashSet<>();
+        int removed = 0;
+        for (int index = this.townHallCores.size() - 1; index >= 0; index--) {
+            TownHallCore core = this.townHallCores.get(index);
+            if (!dimensions.add(core.dimension())) {
+                this.townHallCores.remove(index);
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            this.setDirty();
+        }
+        return removed;
+    }
+
     private int removeDuplicateBuildings() {
+
         int removed = 0;
         for (int index = this.buildings.size() - 1; index >= 0; index--) {
             BuildingObservation candidate = this.buildings.get(index);

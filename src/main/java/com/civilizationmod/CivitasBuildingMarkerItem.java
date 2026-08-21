@@ -81,7 +81,8 @@ public class CivitasBuildingMarkerItem extends Item {
         if (player == null
                 || context.getHand() != InteractionHand.MAIN_HAND
                 || player.isSpectator()
-                || !BuildingMarkerRegistry.isKnownMarker(context.getItemInHand())) {
+                                || !BuildingMarkerRegistry.isTerritoryMarker(context.getItemInHand())) {
+
             return InteractionResult.PASS;
         }
 
@@ -135,7 +136,8 @@ public class CivitasBuildingMarkerItem extends Item {
     ) {
         if (hand != InteractionHand.MAIN_HAND
                 || player.isSpectator()
-                || !BuildingMarkerRegistry.isKnownMarker(player.getItemInHand(hand))) {
+                                || !BuildingMarkerRegistry.isTerritoryMarker(player.getItemInHand(hand))) {
+
             return InteractionResult.PASS;
         }
 

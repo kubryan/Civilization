@@ -57,8 +57,10 @@ public final class CivilizationCommands {
 			return Commands.literal(literal)
 					.then(Commands.literal("status").executes(context -> status(context.getSource())))
 					.then(settlementCommand())
-                        .then(buildingCommand())
+                                                .then(buildingCommand())
+                        .then(townHallCommand())
                                                 .then(assignCommand())
+
                         .then(unassignCommand())
                         .then(simulateCommand())
 
@@ -66,7 +68,13 @@ public final class CivilizationCommands {
 					.then(scanCommand("sc"));
 		}
 
+		private static LiteralArgumentBuilder<CommandSourceStack> townHallCommand() {
+		return Commands.literal("townhall")
+				.executes(context -> townHallStatus(context.getSource()));
+	}
+
 	private static LiteralArgumentBuilder<CommandSourceStack> settlementCommand() {
+
 		return Commands.literal("settlement")
 				.executes(context -> settlementStatus(context.getSource()))
 				.then(Commands.argument("index", IntegerArgumentType.integer(1))
@@ -184,7 +192,30 @@ public final class CivilizationCommands {
 		return 1;
 	}
 
-	private static int settlementStatus(CommandSourceStack source) {
+			private static int townHallStatus(CommandSourceStack source) {
+			CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+			if (data.getTownHallCoreCount() == 0) {
+				source.sendSuccess(() -> CivilizationMessages.translatable(
+						"civilizationmod.command.town_hall.none"), false);
+				return 0;
+			}
+
+			for (TownHallCore core : data.getTownHallCores()) {
+				source.sendSuccess(() -> CivilizationMessages.translatable(
+						"civilizationmod.command.town_hall.entry",
+						core.colonyId(),
+						core.dimension(),
+						core.markerX(),
+						core.markerY(),
+						core.markerZ(),
+						core.createdAt(),
+						core.radius()), false);
+			}
+			return data.getTownHallCoreCount();
+		}
+
+		private static int settlementStatus(CommandSourceStack source) {
+
 		MinecraftServer server = source.getServer();
 		CivilizationWorldData data = CivilizationWorldData.get(server);
 		if (data.getSettlementCount() == 0) {
@@ -284,9 +315,12 @@ public final class CivilizationCommands {
 					radius,
 					summary.detected(),
 					summary.updated(),
-					summary.bound(),
-					summary.valid(),
-					summary.invalid()), false);
+											summary.bound(),
+						summary.valid(),
+						summary.invalid(),
+						summary.townHallsRegistered(),
+						summary.townHallConflicts()), false);
+
 			return summary.updated();
 		}
 
@@ -387,9 +421,13 @@ public final class CivilizationCommands {
                 if (BuildingFunction.WAREHOUSE.id().equals(functionId)) {
                     return Component.translatable("civilizationmod.building.function.warehouse");
                 }
-                if (BuildingFunction.RESIDENCE.id().equals(functionId)) {
-                    return Component.translatable("civilizationmod.building.function.residence");
-                }
+                				if (BuildingFunction.RESIDENCE.id().equals(functionId)) {
+					return Component.translatable("civilizationmod.building.function.residence");
+				}
+				if (BuildingFunction.TOWN_HALL.id().equals(functionId)) {
+					return Component.translatable("civilizationmod.building.function.town_hall");
+				}
+
                 return Component.translatable("civilizationmod.building.function.unknown");
 		}
 
@@ -497,9 +535,13 @@ public final class CivilizationCommands {
                 if (BuildingObservation.VALIDATION_REASON_MARKER_NOT_ATTACHED.equals(reason)) {
                     return Component.translatable("civilizationmod.building.validation.reason.marker_not_attached");
                 }
-                if (BuildingObservation.VALIDATION_REASON_DUPLICATE_TERRITORY.equals(reason)) {
+                                if (BuildingObservation.VALIDATION_REASON_DUPLICATE_TERRITORY.equals(reason)) {
                     return Component.translatable("civilizationmod.building.validation.reason.duplicate_territory");
                 }
+                if (BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL.equals(reason)) {
+                    return Component.translatable("civilizationmod.building.validation.reason.duplicate_town_hall");
+                }
+
                 return Component.translatable("civilizationmod.building.validation.reason.unknown");
 		}
 

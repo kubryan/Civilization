@@ -36,9 +36,11 @@ public final class FoodModelRegressionTest {
 			checkResidenceCapacityRoster();
 			checkBuildingSettlementBinding();
 			checkBuildingGeometryValidator();
-							checkWarehouseTerritoryBounds();
+											checkWarehouseTerritoryBounds();
+				checkTownHallCoreLifecycle();
 
-			System.out.println("FoodModelRegressionTest: PASS");
+				System.out.println("FoodModelRegressionTest: PASS");
+
 	}
 
 	private static void checkDemandNormalization() {
@@ -406,6 +408,47 @@ public final class FoodModelRegressionTest {
 		}
 
 				
+
+		private static void checkTownHallCoreLifecycle() {
+			CivilizationWorldData data = new CivilizationWorldData();
+			BlockPos first = new BlockPos(100, 70, -40);
+			CivilizationWorldData.TownHallRegistration registered = data.registerTownHall(
+					"minecraft:overworld", first, 1234L);
+			if (registered.status() != CivilizationWorldData.TownHallRegistrationStatus.REGISTERED) {
+				throw new AssertionError("first Town Hall should register");
+			}
+			TownHallCore core = data.getTownHallCore("minecraft:overworld");
+			if (core == null || !core.isSameMarker("minecraft:overworld", first)) {
+				throw new AssertionError("registered Town Hall core should be queryable");
+			}
+			equalsLong(1234L, core.createdAt(), "Town Hall created tick");
+			equalsInt(TownHallCore.DEFAULT_RADIUS, core.radius(), "Town Hall default radius");
+
+			CivilizationWorldData.TownHallRegistration same = data.registerTownHall(
+					"minecraft:overworld", first, 9999L);
+			if (same.status() != CivilizationWorldData.TownHallRegistrationStatus.EXISTING) {
+				throw new AssertionError("same Town Hall marker should be idempotent");
+			}
+
+			CivilizationWorldData.TownHallRegistration duplicate = data.registerTownHall(
+					"minecraft:overworld", first.offset(10, 0, 10), 9999L);
+			if (duplicate.status() != CivilizationWorldData.TownHallRegistrationStatus.DUPLICATE) {
+				throw new AssertionError("second Town Hall in one dimension should be rejected");
+			}
+
+			CivilizationWorldData.TownHallRegistration otherDimension = data.registerTownHall(
+					"minecraft:the_nether", first, 2222L);
+			if (otherDimension.status() != CivilizationWorldData.TownHallRegistrationStatus.REGISTERED
+					|| data.getTownHallCoreCount() != 2) {
+				throw new AssertionError("one Town Hall per dimension should be allowed");
+			}
+
+			JsonElement encoded = TownHallCore.CODEC.encodeStart(JsonOps.INSTANCE, core).getOrThrow();
+			TownHallCore decoded = TownHallCore.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+			if (!core.equals(decoded)) {
+				throw new AssertionError("Town Hall core Codec round-trip should preserve data");
+			}
+		}
 
 		private static SettlementAdapter settlement(long foodStock, int stabilityDebt, int stability) {
 
