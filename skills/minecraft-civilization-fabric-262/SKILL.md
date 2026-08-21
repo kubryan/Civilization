@@ -653,3 +653,14 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 `BuildingObservation` 的 `withResident`、`withAddedResident`、`withoutResident` helpers 標記為 legacy compatibility API；新功能不得使用。Building refresh 可以原樣保留 legacy list 作 Codec 相容，但 residence capacity validation 必須以 registry-derived active count 為準。
 
 驗證：`test`、`runFoodModelRegressionTest` 與 `build` 通過；新增 registry-only assignment／unassign test，確認新 assignment 不改動 legacy roster；死亡 test 改為確認 roster 保持 legacy、active registry count 下降、dead resident lookup 不再返回 building。查證日期 2026-08-21。
+
+
+## 已採用：Town Hall colony gate 舊世界過渡模式（2026-08-21）
+
+Town Hall colony gate 採用「無核心時過渡、建立核心後嚴格」政策，以避免舊世界在尚未放置市政廳時突然停止既有 warehouse／住宅功能。`CivilizationWorldData.isTownHallTransitionAllowed(BuildingObservation)` 只在建築本身 `validationStatus=valid` 且該建築所在維度的 `findTownHallBinding(...)` 回傳 `NO_TOWN_HALL` 時為 true；它不會放寬 `OUTSIDE` 或 `OVERLAPPING`。
+
+`CivilizationWorldData.isBuildingOperational(...)` 是 assign、居民導航、warehouse 物流與通用綁定裝置共用的 server-side operational gate。有效 colony-bound 建築可以運作；有效但所在維度完全沒有 Town Hall 的建築以 transition mode 運作；無效建築、已有 Town Hall 但位於範圍外的建築、重疊範圍建築均不可運作。transition mode 不寫入 `colony_id`，建築仍保留 `no_town_hall` binding reason，建立 Town Hall 後由既有 refresh binding 流程取得 colony_id 或變成 outside／overlapping。
+
+玩家可見的過渡模式必須透過 `CivilizationMessages` 與 locale keys 呈現：building inspect/list 顯示 transition binding，assign 與綁定裝置成功訊息告知「此維度尚未建立市政廳」，help 說明 transition policy。不要在每 tick 重複發送訊息；導航與物流只使用 operational gate 靜默執行。這一版不加入 config，先保持所有世界一致且容易回歸測試；未來若要可設定，必須另行查證 Fabric 26.2 config 方案並保存 server-authoritative 設定。
+
+驗證：新增 JUnit 覆蓋「無 Town Hall 的有效 building 可運作」、「建立同維度 Town Hall 後範圍內 building 取得 bound 且範圍外仍拒絕」、「另一維度可獨立使用 transition mode」；`test`、`runFoodModelRegressionTest` 與 `build` 通過。查證日期 2026-08-21。

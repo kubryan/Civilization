@@ -612,6 +612,11 @@ public final class CivilizationCommands {
                                         "civilizationmod.building.binding.colony",
                                         building.colonyId());
                 }
+                if (data.isTownHallTransitionAllowed(building)) {
+                        return Component.translatable(
+                                "civilizationmod.building.binding.transition",
+                                buildingColonyBindingReason(building));
+                }
                 return Component.translatable(
                                 "civilizationmod.building.binding.unbound_reason",
                                 buildingColonyBindingReason(building));
@@ -637,7 +642,7 @@ public final class CivilizationCommands {
                                 buildingValidationReason(currentValidationReason)), false);
                         return 0;
                 }
-                if (!building.isColonyBound()) {
+                if (!data.isBuildingOperational(building)) {
                         Component bindingReason = buildingColonyBindingReason(building);
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.building_not_in_colony",
@@ -750,12 +755,15 @@ public final class CivilizationCommands {
                         return 0;
                 }
                 BuildingResidentService.applyAssignmentVisual(villager, building.functionId());
+                                String successKey = data.isTownHallTransitionAllowed(building)
+                        ? "civilizationmod.command.assign.success.transition"
+                        : "civilizationmod.command.assign.success";
                 source.sendSuccess(() -> CivilizationMessages.translatable(
-                        "civilizationmod.command.assign.success",
-
+                        successKey,
                         index,
                         villager.getName(),
                         villager.getStringUUID()), false);
+
                 return 1;
         }
 

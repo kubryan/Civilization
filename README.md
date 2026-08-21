@@ -21,7 +21,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 /civitas townhall radius <index> <radius>
 ```
 
-有效的住宅與 warehouse 只有在唯一 Town Hall 範圍內時，才會獲得 `colony_id` 並成為 colony-bound 建築。沒有 Town Hall、位於範圍外或範圍衝突的建築，不會執行居民導航、warehouse 物流、居民指派或通用綁定裝置功能。
+有效的住宅與 warehouse 只有在唯一 Town Hall 範圍內時，才會獲得 `colony_id` 並成為 colony-bound 建築。為了避免舊世界在尚未建立市政廳時突然停止運作，若該維度完全沒有 Town Hall，**有效但未綁定的建築會以過渡模式繼續執行居民導航、warehouse 物流、居民指派與通用綁定裝置功能**；建築列表與 assign／綁定成功訊息會明確顯示過渡模式。當該維度建立 Town Hall 後，規則立即恢復嚴格模式：範圍外與重疊範圍的建築仍不可 assign、不可物流、不可使用綁定裝置，也不會取得 `colony_id`。不同維度各自判定，因此某維度沒有市政廳不會放寬另一個已有市政廳維度的範圍限制。
 
 ### Warehouse 倉庫與物流
 
@@ -86,7 +86,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | `/civitas building scan [radius]` | 掃描附近已載入的 Civitas ItemFrame 建築。 |
 | `/civitas building list` | 列出已登記建築與驗證／殖民地狀態。 |
 | `/civitas building inspect <index>` | 查看指定建築、居民與 storage snapshot。 |
-| `/civitas assign <building_index> [villager]` | 將 Villager 指派至有效 colony-bound 建築。 |
+| `/civitas assign <building_index> [villager]` | 將 Villager 指派至有效 colony-bound 建築；該維度尚無 Town Hall 時，使用過渡模式。 |
 | `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係。 |
 | `/civitas resident list` | 查詢 ResidentRecord 清單。 |
 | `/civitas townhall` | 查詢已保存的 Town Hall cores。 |
@@ -107,7 +107,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | 27 格 Civitas Villager backpack | 已完成程式、build 與 client smoke 驗證，並已進行先前遊戲驗收 |
 | 1／2／4／6 容量住宅 marker | 已完成程式、容量檢查與多居民 roster |
 | Town Hall core、SavedData 與多核心非重疊範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
-| `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；完整範圍內外遊戲驗收仍待確認 |
+| `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；無 Town Hall 過渡模式已加入，完整範圍內外遊戲驗收仍待確認 |
 | ResidentRecord／ResidentRegistry | 已完成第一版；已收斂為 assignment 唯一寫入來源並通過 SavedData／Codec 回歸測試 |
 | 村民死亡後釋放住宅容量 | 已完成 server death callback 與回歸測試；等待本次遊戲內重新驗收 |
 | 農田與工作站 | 尚未實作 |
@@ -118,7 +118,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 ## 下一步路線
 
-目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放，以及玩家命令樹整理。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先驗收是：在容量為 2 的住宅中綁定兩名村民，殺死其中一名，確認住宅居民數降為 1、死亡居民 lifecycle 變為 `dead`，並確認新村民可以使用釋放的容量。
+目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放、玩家命令樹整理，以及無 Town Hall 的舊世界過渡運作。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先遊戲內驗收是：在沒有 Town Hall 的維度確認有效 warehouse／住宅仍可 assign、導航與物流，接著建立 Town Hall，確認同一範圍內建築取得 `colony_id`，範圍外建築立即停止 colony 功能。
 
 通過死亡容量的遊戲內驗收後，將繼續完善居民 lifecycle、移除與 body rebind 規則，再處理住宅居民的床位分配與工作建築關係。自訂 NPC Entity 暫不列入下一個切片，因為目前應先穩定 server SavedData、原版 Villager body、住宅容量與物流閉環。
 

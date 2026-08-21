@@ -42,8 +42,7 @@ public final class BuildingLogisticsService {
                 || !villager.isAlive()
                 || villager.isTrading()
                                 || !BuildingFunction.WAREHOUSE.id().equals(building.functionId())
-                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
-                || !building.isColonyBound()) {
+                || !data.isBuildingOperational(building)) {
 
             return false;
         }

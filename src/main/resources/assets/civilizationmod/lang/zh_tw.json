@@ -47,6 +47,7 @@
   "civilizationmod.command.assign.already_assigned": "這名村民已經被指派到（%1$d，%2$d，%3$d）附近的建築。",
   "civilizationmod.command.assign.save_failed": "村民指派資料無法保存。",
     "civilizationmod.command.assign.success": "已將村民 %2$s（%3$s）指派到建築 #%1$d。",
+  "civilizationmod.command.assign.success.transition": "已將村民 %2$s（%3$s）指派到建築 #%1$d。目前為過渡模式：此維度尚未建立市政廳；請放置市政廳以建立殖民地。",
   "civilizationmod.command.unassign.invalid_building": "建築編號 %1$d 無效。目前已觀測建築：%2$d 座。",
   "civilizationmod.command.unassign.target_not_villager": "選取的實體不是原版村民。",
   "civilizationmod.command.unassign.not_assigned": "%1$s 沒有被指派到這棟建築。",
@@ -92,6 +93,7 @@
     "civilizationmod.building.binding.unbound": "未綁定",
   "civilizationmod.building.binding.colony": "殖民地 ID=%1$s",
   "civilizationmod.building.binding.unbound_reason": "未綁定：%1$s",
+  "civilizationmod.building.binding.transition": "過渡模式：%1$s；在放置市政廳前，有效建築仍可運作",
   "civilizationmod.building.colony.reason.bound": "已綁定",
   "civilizationmod.building.colony.reason.no_town_hall": "此維度沒有市政廳",
   "civilizationmod.building.colony.reason.outside_town_hall": "位於所有市政廳範圍之外",
@@ -161,7 +163,8 @@
   "civilizationmod.binding.bind.no_selection": "請先使用裝置選取有效的 Civitas 建築標誌。",
   "civilizationmod.binding.bind.wrong_dimension": "選取的建築位於另一個維度。",
   "civilizationmod.binding.bind.invalid_building": "選取的建築已經不是有效建築。",
-  "civilizationmod.binding.bind.success": "已將村民 %2$s 綁定到 %1$s（目前居民=%3$d）。",
+  "civilizationmod.binding.bind.success": "已將村民 %2$s 綁定到 %1$s（居民=%3$d）。",
+  "civilizationmod.binding.bind.success.transition": "已將村民 %2$s 綁定到 %1$s（居民=%3$d）。目前為過渡模式：此維度尚未建立市政廳；請放置市政廳以建立殖民地。",
 
   "civilizationmod.item.marker.point_a": "第一個點：%1$d，%2$d，%3$d",
   "civilizationmod.item.marker.point_a.unset": "第一個點：尚未設定",
@@ -178,10 +181,10 @@
   "civilizationmod.command.help.title": "Civitas 指令說明：",
   "civilizationmod.command.help.status": "/civitas status：查看文明資料版本、模擬步數、聚落與食物摘要。",
   "civilizationmod.command.help.building": "/civitas building：列出、掃描或檢查建築；使用 building scan、list、inspect <編號>。",
-  "civilizationmod.command.help.assign": "/civitas assign <建築編號> [村民]：將村民指派到有效且屬於殖民地的建築。",
+  "civilizationmod.command.help.assign": "/civitas assign <建築編號> [村民]：將村民指派到有效殖民地建築；若該維度沒有市政廳，有效建築會在市政廳建立前使用過渡模式。",
   "civilizationmod.command.help.unassign": "/civitas unassign <建築編號> [村民]：解除村民與建築的指派關係。",
   "civilizationmod.command.help.resident": "/civitas resident list：查看居民永久身份、body UUID、殖民地、建築與生命週期。",
   "civilizationmod.command.help.townhall": "/civitas townhall：查看市政廳核心；使用 townhall radius <編號> <半徑> 調整範圍。",
-  "civilizationmod.command.help.scan": "/civitas building scan [半徑]：掃描附近的 Civitas 建築標誌與殖民地歸屬。",
+  "civilizationmod.command.help.scan": "/civitas building scan [半徑]：掃描附近的 Civitas 建築標誌與殖民地歸屬；沒有市政廳的建築會顯示為過渡模式。",
   "civilizationmod.command.help.alias": "所有主要指令也可使用 /civilization 相容命令根；輸入 /civitas help 可再次查看本說明。"
 }

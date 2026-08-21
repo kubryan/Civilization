@@ -345,6 +345,33 @@ public final class CivilizationWorldData extends SavedData {
                 null);
     }
 
+    /**
+     * Returns true only for a valid building in a dimension that has no Town Hall
+     * at all. This is the legacy-world transition policy; it never permits a
+     * building outside an existing range or inside overlapping ranges.
+     */
+    public boolean isTownHallTransitionAllowed(BuildingObservation building) {
+        if (building == null
+                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+            return false;
+        }
+        TownHallBinding binding = findTownHallBinding(
+                building.dimension(),
+                new BlockPos(building.markerX(), building.markerY(), building.markerZ()));
+        return binding.status() == TownHallBindingStatus.NO_TOWN_HALL;
+    }
+
+    /**
+     * Server-side operational gate shared by assignment, navigation, logistics,
+     * and the binding device. A valid colony-bound building is operational; a
+     * valid no-Town-Hall building is temporarily operational for old worlds.
+     */
+    public boolean isBuildingOperational(BuildingObservation building) {
+        return building != null
+                && BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
+                && (building.isColonyBound() || isTownHallTransitionAllowed(building));
+    }
+
     public record TownHallRegistration(TownHallRegistrationStatus status, TownHallCore core) {
     }
 

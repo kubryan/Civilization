@@ -112,8 +112,7 @@ public final class BuildingResidentService {
             if (building == null) {
                 continue;
             }
-            boolean buildingValid = BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
-                    && building.isColonyBound();
+            boolean buildingValid = data.isBuildingOperational(building);
 
             ServerLevel buildingLevel = findLevel(server, building.dimension());
             Optional<UUID> residentUuid = resident.entityUuidValue();

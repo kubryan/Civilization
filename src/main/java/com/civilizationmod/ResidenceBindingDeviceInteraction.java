@@ -127,8 +127,7 @@ public final class ResidenceBindingDeviceInteraction {
                 selected.markerY(),
                 selected.markerZ());
         if (building == null
-                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
-                || !building.isColonyBound()) {
+                || !data.isBuildingOperational(building)) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.binding.bind.invalid_building"));
             return InteractionResult.FAIL;
@@ -205,8 +204,11 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.FAIL;
         }
         BuildingResidentService.applyAssignmentVisual(villager, building.functionId());
+        String successKey = data.isTownHallTransitionAllowed(building)
+                ? "civilizationmod.binding.bind.success.transition"
+                : "civilizationmod.binding.bind.success";
         player.sendSystemMessage(CivilizationMessages.translatable(
-                "civilizationmod.binding.bind.success",
+                successKey,
                 functionName(building.functionId()),
                 villager.getName(),
                 data.countActiveResidents(building)));

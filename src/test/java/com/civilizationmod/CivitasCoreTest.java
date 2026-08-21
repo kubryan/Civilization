@@ -306,6 +306,77 @@ class CivitasCoreTest {
     }
 
     @Test
+    void noTownHallAllowsValidBuildingTransitionButExistingRangeRemainsStrict() {
+        BuildingObservation transitionBuilding = new BuildingObservation(
+                BuildingFunction.WAREHOUSE.id(),
+                "minecraft:overworld",
+                10,
+                64,
+                20,
+                BuildingObservation.STATUS_UNBOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                100L,
+                100L,
+                "",
+                0,
+                0,
+                0);
+        BuildingObservation outsideBuilding = new BuildingObservation(
+                BuildingFunction.WAREHOUSE.id(),
+                "minecraft:overworld",
+                500,
+                64,
+                20,
+                BuildingObservation.STATUS_UNBOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                100L,
+                100L,
+                "",
+                0,
+                0,
+                0);
+        BuildingObservation otherDimensionBuilding = new BuildingObservation(
+                BuildingFunction.WAREHOUSE.id(),
+                "minecraft:the_nether",
+                500,
+                64,
+                20,
+                BuildingObservation.STATUS_UNBOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                100L,
+                100L,
+                "",
+                0,
+                0,
+                0);
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addBuildingObservation(transitionBuilding));
+        assertTrue(data.addBuildingObservation(outsideBuilding));
+        assertTrue(data.addBuildingObservation(otherDimensionBuilding));
+
+        assertSame(CivilizationWorldData.TownHallBindingStatus.NO_TOWN_HALL,
+                data.findTownHallBinding("minecraft:overworld", new BlockPos(10, 64, 20)).status());
+        assertTrue(data.isTownHallTransitionAllowed(transitionBuilding));
+        assertTrue(data.isBuildingOperational(transitionBuilding));
+        assertTrue(data.isTownHallTransitionAllowed(otherDimensionBuilding));
+
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED,
+                data.registerTownHall("minecraft:overworld", new BlockPos(0, 64, 0), 200L).status());
+        assertFalse(data.isTownHallTransitionAllowed(transitionBuilding));
+        assertTrue(data.isBuildingOperational(data.getBuilding(1)));
+        assertSame(CivilizationWorldData.TownHallBindingStatus.OUTSIDE,
+                data.findTownHallBinding("minecraft:overworld", new BlockPos(500, 64, 20)).status());
+        assertFalse(data.isTownHallTransitionAllowed(data.getBuilding(2)));
+        assertFalse(data.isBuildingOperational(data.getBuilding(2)));
+        assertTrue(data.isTownHallTransitionAllowed(data.getBuilding(3)));
+        assertTrue(data.isBuildingOperational(data.getBuilding(3)));
+    }
+
+    @Test
     void territoryBoundsAreInclusiveAndComparable() {
         WarehouseTerritory territory = new WarehouseTerritory(
                 1,

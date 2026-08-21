@@ -4267,3 +4267,54 @@ README 的 References 使用 Fabric 官方 Saved Data 與 Events 文件，不把
 - [1] Fabric Saved Data：https://docs.fabricmc.net/develop/saved-data
 - [2] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
 - [3] 專案 `ResidentRegistry`、`CivilizationWorldData`、`CivitasCoreTest` 與實際 Gradle build，查證日期 2026-08-21。
+
+
+## 2026-08-21 — Town Hall colony gate 舊世界過渡模式
+
+### 設計決策
+
+原本的 colony gate 對沒有 Town Hall、超出 Town Hall 範圍及重疊範圍一律停止 assign、居民導航、warehouse 物流與通用綁定裝置。這對新殖民地流程合理，但會讓已存在 warehouse／住宅且尚未建立市政廳的舊世界在重開後突然失去功能。本次採用固定的 server-side 過渡政策，不加入未查證的 config API：**若某個維度完全沒有 Town Hall，該維度內有效但未綁定的 warehouse／住宅以 transition mode 維持原有運作；只要該維度已有 Town Hall，範圍外與重疊範圍仍維持嚴格拒絕。**
+
+過渡模式不會偽造 `colony_id`，建築仍保存 `no_town_hall` binding reason。建立 Town Hall 後，既有 colony binding refresh 會使範圍內建築取得 `colony_id`，範圍外建築變成 `outside_town_hall`，衝突建築維持 `overlapping_town_hall`；不同維度獨立判定。
+
+### 實作內容
+
+新增 `CivilizationWorldData.isTownHallTransitionAllowed(BuildingObservation)`，只對有效且 `findTownHallBinding(...)` 狀態為 `NO_TOWN_HALL` 的建築回傳 true；它不放寬 `OUTSIDE`、`OVERLAPPING` 或 invalid。新增 `isBuildingOperational(...)` 作為 assign、居民導航、warehouse 物流與通用綁定裝置共用的 server-authoritative operational gate。
+
+`/civitas assign` 與通用綁定裝置在 transition mode 仍可寫入 ResidentRegistry canonical assignment，但成功訊息會告知此維度尚未建立市政廳。building inspect／list 會顯示 transition binding。help 與三份 locale 也說明 transition mode。每 tick 不重複發送提示，避免聊天訊息污染；只有玩家執行 assign／綁定或查看建築時看到明確說明。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：新增 Town Hall transition 判斷及共用 operational gate。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：居民導航改用 operational gate。
+- `src/main/java/com/civilizationmod/BuildingLogisticsService.java`：warehouse 入庫改用 operational gate。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：綁定裝置改用 operational gate，並新增 transition success key。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：assign gate、building binding 摘要與 transition success message。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：英文 transition 與 help 訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：繁體中文 transition 與 help 訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文 transition 與 help 訊息。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增無 Town Hall 過渡、建立核心後範圍內外 gate 與跨維度獨立判定測試。
+- `README.md`：同步舊世界相容策略、命令表與下一步遊戲內驗收。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md` 與 `skills/minecraft-civilization-fabric-262/SKILL.md`：同步可重用 colony gate 規則。
+- `Mods.md`：追加本次設計與驗證紀錄。
+
+### 查證與驗證
+
+本次沒有新增版本敏感的 Fabric 26.2 API；過渡模式只重用既有 `TownHallBinding`、SavedData 與 common-side service gate。common/client 邊界保持不變，沒有引入 client-only 類別，也沒有加入未查證 config 系統。
+
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain`：`BUILD SUCCESSFUL`；新增 transition regression 通過，`FoodModelRegressionTest: PASS`。
+- 完整 `build`：本次程式與測試驗證已通過 compileJava、compileClientJava、processResources、JUnit、check、jar 與 assemble；文件同步後的最終 build 待執行。
+- 三份 locale 由 `processResources` 處理，transition keys 已同步。
+
+### 未完成與風險
+
+過渡模式目前固定啟用，尚未提供 config 開關；這是刻意選擇，避免在尚未查證 Fabric 26.2 config 方案前引入不可靠 API。若未來需要伺服器管理員關閉過渡模式，應另開資料保存與設定驗證切片。遊戲內尚未重新驗收：無 Town Hall 時有效建築可 assign／導航／物流、建立 Town Hall 後範圍內外立即恢復嚴格 gate，以及跨維度獨立判定。
+
+### 下一步
+
+在舊世界先不要放 Town Hall，對已掃描且有效的 warehouse／住宅執行 `building inspect`、`assign` 與物流驗證；確認顯示 transition mode。接著放置 Town Hall 並執行 `building scan`，確認範圍內建築取得 colony_id、範圍外建築停止 assign／導航／物流與綁定裝置。最後在另一個沒有 Town Hall 的維度確認有效建築仍可使用 transition mode。
+
+
+### 2026-08-21 最終驗證補記
+
+文件同步後重新執行 `gradlew.bat --no-daemon build --console=plain`，結果為 `BUILD SUCCESSFUL`；`compileJava`、`compileClientJava`、`processResources`、JUnit、`runFoodModelRegressionTest`、`check`、`jar`、`sourcesJar`、`assemble` 均完成，並再次得到 `FoodModelRegressionTest: PASS`。先前的 `git diff --check` 只輸出 Windows CRLF 轉換警告，沒有列出實際 trailing whitespace error；遊戲內過渡模式仍待人工驗收。
