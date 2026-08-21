@@ -582,3 +582,8 @@ Town Hall 不再限制為每個維度一座；每個核心保存自己的 `colon
 BuildingObservation 將 `colony_id` 與 `colony_binding_reason` 放入既有 nested CodecTail 的 optional fields，確保舊 `resident_uuid`、`resident_name`、storage 與 roster 資料可載入；legacy status 可保留但沒有 colony_id 時不視為 `isColonyBound()`。新增或更新 Town Hall 半徑後會即時 refresh 已保存建築的 colony binding；結構 invalid 的建築不保留可運作 colony binding。
 
 驗證：`compileJava compileClientJava test`、`runDatagen`、`runFoodModelRegressionTest` 與完整 `build` 均通過；`CivitasCoreTest` 新增多核心不重疊、半徑更新拒絕重疊、跨維度並存、Town Hall binding status 與 BuildingObservation colony Codec 測試。
+
+
+## 已查證：市政廳 marker shapeless recipe（2026-08-21）
+
+Minecraft 26.2 common jar 的 `net.minecraft.data.recipes.ShapelessRecipeBuilder` 已由 javap 確認公開 `requires(ItemLike)`、`requires(ItemLike,int)`、`unlockedBy(...)` 與 `save(...)`。市政廳 marker 的無序配方應使用 `FabricRecipeProvider` 的 `shapeless(RecipeCategory.MISC, ItemLike)`，依序加入 `Items.EMERALD`、`Items.IRON_SWORD`、`Items.IRON_PICKAXE`、`Items.IRON_AXE` 與 `Items.IRON_SHOVEL` 各一份；綠寶石為解鎖條件。排列不影響合成，不能保留 shaped pattern，也不能用單一 item tag 取代四種指定工具。

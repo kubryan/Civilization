@@ -487,3 +487,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：沒有核心、範圍外、重疊範圍分別保存 `no_town_hall`、`outside_town_hall`、`overlapping_town_hall`；未 colony-bound 建築不參與導航、物流、assign 或綁定裝置。
 - 採用：`BuildingObservation` 新欄位放在 nested CodecTail optional fields；legacy status 可保留但沒有 colony_id 不算 colony-bound。
 - 驗證：`compileJava compileClientJava test`、`runDatagen`、`runFoodModelRegressionTest`、`build` 均成功；日期 2026-08-21。
+
+
+## 2026-08-21 — 市政廳無序合成 recipe API 查證
+
+- 任務：將 Town Hall marker 改為綠寶石必須存在、四種鐵工具順序不限的 shapeless recipe。
+- 已確認：Minecraft 26.2 common jar 的 `net.minecraft.data.recipes.ShapelessRecipeBuilder` 公開 `requires(ItemLike)`、`requires(ItemLike,int)`、`unlockedBy(...)` 與 `save(...)`；目前 `FabricRecipeProvider` 的 `shapeless(RecipeCategory, ItemLike)` 產生流程可編譯並由 runDatagen 驗證。
+- 採用：`shapeless(RecipeCategory.MISC, TOWN_HALL_MARKER).requires(Items.EMERALD).requires(Items.IRON_SWORD).requires(Items.IRON_PICKAXE).requires(Items.IRON_AXE).requires(Items.IRON_SHOVEL)`；每種材料各一份，排列不影響配方，解鎖條件使用持有綠寶石。
+- 禁止：不要保留市政廳的 `pattern(...)` shaped layout，也不要用單一 `ItemTags` 取代四種指定工具。
+- 查證：Minecraft 26.2 common jar `ShapelessRecipeBuilder` javap，日期 2026-08-21。

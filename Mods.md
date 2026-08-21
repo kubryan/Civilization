@@ -3964,3 +3964,33 @@ test { useJUnitPlatform() }
 ### 下一步
 
 在遊戲內驗收 `/civitas townhall radius 1 128`、跨範圍多核心、範圍外建築未綁定，以及範圍內住宅／warehouse 顯示相同 colony_id。驗收通過後，建立第一版 `ResidentRecord`／ResidentRegistry，將居民身份從單純 building roster 抽離，並保存居民的 colony_id、住宅、工作建築與 body type。
+
+
+## 2026-08-21 — 市政廳 marker 改為無序合成
+
+### 變更
+
+依使用者新規則，市政廳 marker 不再要求固定排列。配方現在要求綠寶石、鐵劍、鐵鎬、鐵斧與鐵鏟各一份；五種材料可在合成台中任意排列。綠寶石仍是必要材料，也是 recipe advancement 的解鎖條件。
+
+### 影響檔案
+
+- `src/client/java/com/civilizationmod/client/CivilizationModRecipeProvider.java`：將 `town_hall_marker` 從 shaped recipe 改為 `shapeless`，使用五個指定 `ItemLike` 材料。
+- `src/main/generated/data/civilizationmod/recipe/town_hall_marker.json`：datagen 生成 `minecraft:crafting_shapeless`，ingredients 為 emerald、iron_sword、iron_pickaxe、iron_axe、iron_shovel。
+- `src/main/generated/data/civilizationmod/advancement/recipes/misc/town_hall_marker.json`：保留 recipe unlock，條件為持有綠寶石。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md` 與全域 Minecraft skill：追加 26.2 `ShapelessRecipeBuilder` API 查證與配方規則。
+
+### 查證與驗證
+
+- 版本：Minecraft 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Loom 1.17.19、Gradle 9.5.1、Java 25。
+- 26.2 common jar `javap` 確認 `ShapelessRecipeBuilder.requires(ItemLike)`、`requires(ItemLike,int)`、`unlockedBy(...)` 與 `save(...)` 公開存在。
+- `gradlew.bat --no-daemon runDatagen --console=plain`：`BUILD SUCCESSFUL`，生成 recipe 與 advancement。
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest build --console=plain`：`BUILD SUCCESSFUL`；`CivitasCoreTest` 通過，`FoodModelRegressionTest: PASS`。
+- 生成 JSON 已檢查，recipe type 為 `minecraft:crafting_shapeless`，五種材料各一份，輸出為 `civilizationmod:town_hall_marker`。
+
+### 未完成與風險
+
+尚未由玩家在遊戲內實際排列五種材料驗收；這是 recipe 資料變更，不影響既有 Town Hall SavedData 或 colony_id。若舊世界已取得舊 shaped recipe 的 advancement，重新載入後新 recipe ID 不變，玩家仍可使用同一 recipe 解鎖資料。
+
+### 下一步
+
+啟動 client 後，在合成台將綠寶石、鐵劍、鐵鎬、鐵斧與鐵鏟任意排列，確認可取得市政廳 marker；再回到 Town Hall 多核心範圍與 colony_id 的遊戲內驗收。
