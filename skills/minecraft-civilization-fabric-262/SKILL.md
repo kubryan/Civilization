@@ -542,3 +542,21 @@ Fabric 官方 [Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-ge
 市政廳 marker 採 3×2 shaped recipe：第一列 `esp` 代表綠寶石、鐵劍、鐵鎬；第二列使用 `ah `（第三格為空白）代表鐵斧、鐵鏟並靠左排列。Minecraft 26.2 的 `ShapedRecipeBuilder.pattern(...)` 要求每列寬度相同，不能直接使用兩字元的 `ah`。配方輸出 `CivilizationItems.TOWN_HALL_MARKER`，以持有綠寶石作為 advancement unlock 條件。正式 JSON 必須由 `runDatagen` 生成，不手寫與 provider 不一致的副本。
 
 查證日期：2026-08-21；查證方式：Fabric 官方 recipe generation 文件與本機 Minecraft 26.2 common jar `javap`。
+
+
+## 已查證：自訂 NPC Entity 路線評估（2026-08-21）
+
+Fabric 官方 [Creating Your First Entity 26.2](https://docs.fabricmc.net/develop/entities/first-entity) 的最小流程是 `PathfinderMob` 子類、`EntityType.Builder.of(...).sized(...)`、`FabricDefaultAttributeRegistry.register(...)`、server-side goals，以及 client-only render state、model layer、renderer 與 `EntityRenderers.register(...)`。持久 entity-local state 使用 `addAdditionalSaveData(ValueOutput)`／`readAdditionalSaveData(ValueInput)`；需要顯示同步的短期狀態才使用 `SynchedEntityData`。
+
+Civitas 目前不立即新增自訂 Entity。先完成 Town Hall colony ownership、住宅／warehouse 指派與物流閉環，再從 `ResidentRecord`／`ResidentRegistry` 抽離居民真實資料；現有原版 Villager 先作為可替換 body adapter。`BuildingObservation.residents` 與 `CivilizationWorldData.findBuildingAssignedTo(String)` 可作為過渡，但尚缺全域 colony ID、住宅 building ID、工作 building ID、角色、生命週期與 body type 等 ResidentRecord 欄位。
+
+不要把 colony truth 只塞進 Entity NBT，也不要在同一個切片同時處理 EntityType、renderer、背包、物流、住宅容量與完整工作 AI。官方 26.2 文件範例仍須依本機 compile／javap 驗證後才能實作。
+
+
+## 已查證：ResidentRecord 雙 UUID 與 26.2 lookup 修正（2026-08-21）
+
+`residentId` 是 Civitas 永久邏輯身份，`entityUuid` 是目前 Minecraft body 的 UUID；原版 Villager 初次指派時使用 `villager.getUUID()` 作為 entityUuid，未來換 body 時只更新 entityUuid，不更換 residentId。`BuildingObservation` 未來應保存 residentId，而不是把 entityUuid 當作殖民地身份；舊 `ResidentAssignment.uuid` 遷移時第一階段可把既有 UUID 同時當作 residentId 與 entityUuid，新的 assign 才建立獨立 residentId。
+
+不得在 chunk unload 時清除 entityUuid；lookup 找不到可能只是 body 未載入。只有 server 驗證的死亡、移除或 rebind 才能改 entityUuid／lifecycle。第一版不自動復活死亡原版村民。SavedData 保存 ResidentRecord canonical list／Codec，`byResidentId` 與 `byEntityUuid` 是載入後重建的 runtime indexes，不是第二個可修改的真相來源。建築關係應使用 dimension + marker coordinates 或未來 immutable building ID，不得保存易變的 one-based scan index。
+
+本機 Minecraft 26.2 common jar javap 確認 `Entity.getUUID()`、`Entity.setUUID(UUID)` 與 `ServerLevel.getEntityInAnyDimension(UUID)`；未確認 `level.getEntity(UUID)`，`EntityGetter` 公開的是空間 `getEntities(...)` 與 `getPlayerByUUID(UUID)`。禁止把附件中的 `level.getEntity(entityUuid)` 當作 26.2 API。

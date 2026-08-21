@@ -3697,3 +3697,119 @@ Fabric 官方 [Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-ge
 - [1] https://docs.fabricmc.net/develop/data-generation/recipes — Fabric Recipe Generation 26.2。
 - [2] https://docs.fabricmc.net/develop/data-generation/setup — Fabric Data Generation Setup 26.2。
 - [3] 本機 Minecraft 26.2 common jar `javap`：`Items` Item 常數與實際 datagen stacktrace，查證日期 2026-08-21。
+
+
+## 2026-08-21 — 自訂 NPC 路線評估與 ResidentRecord 分層決策
+
+### 評估結論
+
+本次評估 Grok 提出的自訂 NPC 建議。整體方向正確：Entity 應分成 server-side 行為與資料、client-side renderer／model／texture，文明真實狀態不應只依賴世界中目前載入的實體；但 Civitas 現階段不立即新增自訂 Entity。
+
+目前模組已經以原版 Villager 完成居民指派、住宅 roster、warehouse 物流、27 格 Civitas 背包與導向建築 marker。此時直接引入 `CivitasResidentEntity` 會同時牽涉 EntityType、attributes、goals、renderer、model layer、資料同步、背包互動、物流服務、住宅容量、命令與既有存檔遷移，工作面積遠大於單純新增一種生物。正確順序是先完成 Town Hall colony ownership 與住宅／warehouse 的殖民地閉環，再抽離居民資料層。
+
+### 建議的資料分層
+
+| 層 | Civitas 責任 | 現階段策略 |
+|---|---|---|
+| `BuildingObservation` | 建築 marker、建築功能、驗證狀態、住宅容量與暫時 roster | 保留現有 `residents`，作為過渡相容資料。 |
+| `ResidentRecord`／`ResidentRegistry` | 居民 UUID、`colony_id`、住宅 building key、工作 building key、角色、生命週期與 body type | 下一個居民資料切片才新增，server SavedData 為真相來源。 |
+| 原版 Villager | 目前世界中的居民 body、導航、背包與物流執行者 | 現階段繼續使用，不轉換既有村民。 |
+| `CivitasResidentEntity` | 未來可替換的自訂居民 body | 等資料層與服務介面穩定後，再做最小召喚／行走切片。 |
+
+目前 `BuildingObservation` 已保存 `ResidentAssignment` UUID／名稱清單，`CivilizationWorldData.findBuildingAssignedTo(String)` 也能依 UUID 找到建築，因此具備抽離的起點；但仍缺全域 `colony_id`、住宅與工作建築 key、角色、生命週期與 body type。未來新增 `ResidentRecord` 時，必須避免 `BuildingObservation` 與 `ResidentRecord` 同時成為可修改的兩個真相來源；應由 `ResidentRecord` 作 canonical，舊 roster 只作 legacy compatibility 或由服務層同步。
+
+### 分階段路線
+
+1. **現在：完成市政廳殖民地歸屬。** 依同維度與 Town Hall 半徑 64 將有效 warehouse／residence 綁定 `colony_id`；沒有核心、核心衝突或超出範圍時標記未綁定。
+2. **下一個居民資料切片：建立 `ResidentRecord`。** 先保存原版 Villager UUID、殖民地 ID、住宅建築、工作建築、角色與 `body_type=vanilla_villager`。從既有 BuildingObservation roster 做一次相容遷移，舊世界資料缺少新欄位時使用 optional defaults；此階段不新增 Entity。
+3. **建立 body adapter／服務邊界。** 將指派、導航、背包開啟、物流入庫與角色視覺操作集中於 common-side resident service，使呼叫端不直接假設一定是 `Villager`。既有原版村民實作先通過此介面，命令與殖民地規則改讀 ResidentRecord。
+4. **最小自訂 Entity 垂直切片。** 未來只實作一個可 `/summon` 的 `CivitasResidentEntity`：註冊 EntityType、基本 attributes、最少 goal、重開存檔與簡單 client renderer。第一版不做交易、完整工作 AI、背包 GUI、物流與住宅入住，避免一次跨越太多系統。
+5. **最後才接入殖民地工作。** 讓自訂居民透過同一套 resident service 執行 warehouse／住宅工作；既有原版 Villager 不自動轉換，避免玩家存檔中的 UUID、村民交易與原版 AI 被破壞。
+
+### 26.2 API 查證
+
+Fabric 官方 [Creating Your First Entity 26.2](https://docs.fabricmc.net/develop/entities/first-entity) 說明最小自訂 Entity 流程：`PathfinderMob` 子類、`EntityType.Builder.of(...).sized(...)`、`FabricDefaultAttributeRegistry.register(...)`、server-side goals，以及 client-only render state、model layer、renderer 與 `EntityRenderers.register(...)`。持久的 entity-local state 使用 `addAdditionalSaveData(ValueOutput)`／`readAdditionalSaveData(ValueInput)`；需要供 client 顯示的短期狀態才使用 `SynchedEntityData`。[1]
+
+這次只完成官方文件查證與架構決策，沒有把文件範例當成已實作 API，也沒有猜測如何直接重用原版 Villager renderer。若未來要共用村民外觀，仍需針對 Minecraft 26.2 的 renderer／model class 以實際 `javap` 與 compile 查證；官方教學本身採用自訂 model layer 與 renderer，不能直接推論重用成本為零。
+
+### 影響檔案
+
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加自訂 Entity 官方流程與延後導入規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步專案 skill。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域 skill。
+- `Mods.md`：保存本次架構評估與決策。
+- 尚未修改 Java、registry、EntityType、renderer 或世界資料 schema；本次不新增自訂 NPC。
+
+### 驗證與風險
+
+本次查證使用 Fabric 官方 26.2 Entity 文件，並檢查目前 `BuildingObservation` 與 `CivilizationWorldData`。沒有執行自訂 Entity build，因為本次是架構評估而非實作；不能宣稱自訂 Entity 已可用。主要風險是未來新增 ResidentRecord 時產生雙重真相、居民死亡／卸載／換 body 時 UUID 生命週期不清，以及直接重用原版 Villager renderer 可能需要額外 26.2 API 查證。
+
+### 下一步
+
+下一個實作應是「市政廳殖民地歸屬切片」，不是自訂 NPC：先讓有效住宅與 warehouse 依同維度、Town Hall 核心半徑 64 寫入 `colony_id`，並讓 scan／inspect 能顯示已綁定、無核心、超出範圍與核心衝突。殖民地歸屬通過遊戲內驗收後，再設計 ResidentRecord。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/entities/first-entity — Fabric Creating Your First Entity 26.2。
+- [2] https://docs.fabricmc.net/develop/porting/ — Fabric Porting to 26.2。
+
+
+## 2026-08-21 — Grok ResidentRecord 雙 UUID 分析與 26.2 API 修正
+
+### 附件重點
+
+Grok 的附件以「戶籍／身體」模型說明居民資料：`residentId` 是 Civitas 永久邏輯身份，`entityUuid` 是目前世界中的 Minecraft Entity 身體 UUID；建築應關聯 residentId，而不是直接關聯目前身體。這個方向適合 Civitas 的長期殖民地架構，也能支援原版村民死亡、未載入、換身體與未來自訂 Entity。
+
+附件也正確指出 `BuildingObservation` 不應長期成為完整居民資料的唯一容器。現在的 `BuildingObservation.residents` 與 `CivilizationWorldData.findBuildingAssignedTo(String)` 可以作為過渡，但未來要抽出 `ResidentRecord`／`ResidentRegistry`，集中保存 colony ID、住宅 building key、工作 building key、角色、body type 與生命週期。
+
+### 採用的雙 UUID 設計
+
+| 欄位 | 意義 | 生命週期 |
+|---|---|---|
+| `residentId` | Civitas 戶籍／邏輯身份主鍵 | 建立後永久保存；換身體不變。 |
+| `entityUuid` | 目前 Minecraft body 的 UUID | 初次指派原版村民時使用 `villager.getUUID()`；死亡、移除或 rebind 時才更新。 |
+| `bodyType` | 目前身體種類 | 第一版為 `vanilla_villager`，未來可加入 `civitas_resident`。 |
+| `lifecycle` | 居民狀態 | 建議至少區分 `active`、`body_missing`、`deceased`、`retired`。 |
+| `lastKnownPosition` | 重連與除錯提示 | 只作提示，不作居民身份真相。 |
+
+舊世界遷移時，既有 `BuildingObservation.ResidentAssignment.uuid` 沒有獨立 residentId，因此第一階段可把既有 UUID 同時視為 residentId 與 entityUuid，確保既有住宅與 warehouse 指派可被讀回。新 `/civitas assign` 才建立獨立 residentId。未來 BuildingObservation 應保存 residentId；一個 residentId 與一個 entityUuid 的 runtime index 可在 SavedData 載入後重建，但不能讓兩份資料同時成為可修改的真相來源。
+
+### 重要生命週期修正
+
+不能在 chunk unload 時清除 entityUuid。原版村民可能只是暫時離開載入範圍，lookup 找不到不代表死亡或資料遺失。entityUuid 應保留，並以 runtime lookup miss 或 `body_missing` 診斷狀態表達目前沒有可操作 body。只有 server 驗證的死亡、移除或 rebind 才能改 entityUuid／lifecycle；第一版不自動復活死亡原版村民。
+
+建築關係不得保存目前 `/civitas building list` 的 one-based index，因為重掃、刪除或排序都可能使 index 改變。應使用 dimension + marker 座標作為穩定 building key，或日後新增 immutable building ID。
+
+### 26.2 API 查證與附件修正
+
+本機 Minecraft 26.2 common jar 以 JDK 25 `javap` 查證：`Entity.getUUID()`、`Entity.setUUID(UUID)` 可用；`ServerLevel` 公開的是 `getEntity(int)` 與 `getEntityInAnyDimension(UUID)`，沒有查到附件示例中的通用 `level.getEntity(UUID)`。`EntityGetter` 公開空間 `getEntities(...)` 與 `getPlayerByUUID(UUID)`，也沒有通用 `getEntity(UUID)`。因此附件中的：
+
+```text
+Entity entity = level.getEntity(entityUuid);
+```
+
+不能直接當成已驗證的 Fabric／Minecraft 26.2 API。未來 ResidentRecord lookup 應以已查證的 server-side strategy 實作，候選為 `ServerLevel.getEntityInAnyDimension(UUID)`，並在取得後再次驗證 Entity 所在維度、類型與 server 權限。這個 lookup 尚未寫入 Java，也未宣稱已完成 runtime 行為驗證。
+
+`Entity.getUUID()`、`Entity.setUUID(UUID)` 與 `ServerLevel.getEntityInAnyDimension(UUID)` 的查證結果已同步寫入三份 Minecraft skill。附件原始內容則保留在本次任務提供的 `pasted_content.txt`，不納入模組 runtime。
+
+### 影響檔案
+
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加雙 UUID、chunk unload 與 26.2 lookup 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步相同結論。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域規則。
+- `Mods.md`：追加本附件分析與 API 修正。
+- 尚未修改 Java、Entity registry、ResidentRecord Codec 或 schema；本次是架構與 API 查證，不是實作切片。
+
+### 驗證結果與風險
+
+已讀取附件、目前 `BuildingObservation`／`CivilizationWorldData`，並完成本機 26.2 common jar `javap`。沒有執行 ResidentRecord 編譯或 runtime 測試，因為尚未開始實作。後續新增資料層時，需先決定 schema version、舊 roster 遷移、entity death／removal event、跨維度 lookup 與 duplicate UUID 修復策略。
+
+### 下一步
+
+先完成市政廳殖民地歸屬切片；之後才建立第一版 `ResidentRecord`／`ResidentRegistry`，包含 `residentId`、optional `entityUuid`、`colonyId`、home/work building key、role、body type 與 lifecycle。完成 SavedData round-trip、舊住宅／warehouse 指派遷移與 `/civitas resident list` 後，才進入自訂 NPC Entity。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/entities/first-entity — Fabric Creating Your First Entity 26.2。
+- [2] https://docs.fabricmc.net/develop/saved-data — Fabric Saved Data。
+- [3] 本機 Minecraft 26.2 common jar `javap`：`Entity`、`ServerLevel`、`ServerEntityGetter`、`EntityGetter`，JDK 25，查證日期 2026-08-21。

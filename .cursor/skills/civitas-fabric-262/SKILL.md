@@ -389,6 +389,26 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 查證：[Fabric Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes)、本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 JDK 25 `javap`；日期 2026-08-21。
 
 
+## 2026-08-21 — 自訂 NPC Entity 路線評估
+
+- 任務：評估是否立即將原版 Villager 替換為 Civitas 自訂居民 Entity。
+- 已確認：Fabric 官方 [Creating Your First Entity 26.2](https://docs.fabricmc.net/develop/entities/first-entity) 的最小流程是 `PathfinderMob` 子類、`EntityType.Builder.of(...).sized(...)`、`FabricDefaultAttributeRegistry.register(...)`、server-side goals，以及 client-only render state、model layer、renderer 與 `EntityRenderers.register(...)`。持久 entity-local state 使用 `addAdditionalSaveData(ValueOutput)`／`readAdditionalSaveData(ValueInput)`；需要顯示同步的短期狀態才使用 `SynchedEntityData`。
+- 採用：Civitas 目前不立即新增自訂 Entity。先完成 Town Hall colony ownership、住宅／warehouse 指派與物流閉環，再從 `ResidentRecord`／`ResidentRegistry` 抽離居民真實資料；現有原版 Villager 先作為可替換 body adapter。
+- 採用：`BuildingObservation.residents` 與 `CivilizationWorldData.findBuildingAssignedTo(String)` 可作為過渡，但尚缺全域 colony ID、住宅 building ID、工作 building ID、角色、生命週期與 body type 等 ResidentRecord 欄位。
+- 禁止：不要把 colony truth 只塞進 Entity NBT；不要在同一個切片同時處理 EntityType、renderer、背包、物流、住宅容量與完整工作 AI；不要把官方 26.2 文件範例當成未經本機 compile／javap 驗證的任意舊版 API。
+- 查證：官方 Entity 26.2 文件與目前 `BuildingObservation`／`CivilizationWorldData` 架構檢查；日期 2026-08-21。
+
+
+## 2026-08-21 — ResidentRecord 雙 UUID 與 26.2 lookup 修正
+
+- `residentId` 是 Civitas 永久邏輯身份，`entityUuid` 是目前 Minecraft body 的 UUID；原版 Villager 初次指派時使用 `villager.getUUID()` 作為 entityUuid，但未來換 body 時只更新 entityUuid，不更換 residentId。
+- `BuildingObservation` 未來應保存 residentId，而不是把 entityUuid 當作殖民地身份。現有 `ResidentAssignment.uuid` 是 legacy：遷移舊世界時第一階段可把既有 UUID 同時當作 residentId 與 entityUuid，避免無法反查；新的 assign 才建立獨立 residentId。
+- 不得在 chunk unload 時清除 entityUuid；lookup 找不到可能只是 body 未載入。只有 server 驗證的死亡、移除或 rebind 才能改 entityUuid／lifecycle。第一版不自動復活死亡原版村民。
+- Minecraft 26.2 common jar javap 確認 `Entity.getUUID()`、`Entity.setUUID(UUID)`，`ServerLevel.getEntityInAnyDimension(UUID)`；未確認 `level.getEntity(UUID)`，`EntityGetter` 公開的是空間 `getEntities(...)` 與 `getPlayerByUUID(UUID)`。禁止把附件中的 `level.getEntity(entityUuid)` 當作 26.2 API。
+- SavedData 保存 ResidentRecord canonical list／Codec；`byResidentId` 與 `byEntityUuid` 只是在載入後重建的 runtime indexes，不是第二個可修改的真相來源。building relationship 應使用 dimension + marker coordinates 或未來 immutable building ID，不得保存易變的 one-based scan index。
+- 查證：本機 Minecraft 26.2 common jar `javap`，JDK 25；日期 2026-08-21。
+
+
 ## 2026-08-21 — 市政廳 marker 視覺 prototype 與功能分層
 
 - 任務：建立市政廳 marker 的方塊式 item model 與獨立材質。
