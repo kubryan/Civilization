@@ -54,10 +54,10 @@ public final class CivitasVillagerBackpackMenu extends ChestMenu {
             return false;
         }
 
-        BuildingObservation building = CivilizationWorldData.get(serverLevel.getServer())
+                BuildingObservation building = CivilizationWorldData.get(serverLevel.getServer())
                 .findBuildingAssignedTo(this.villager.getUUID().toString());
-        return building != null
-                && BuildingObservation.VALIDATION_VALID.equals(building.validationStatus());
+        return building != null;
+
     }
 
     @Override

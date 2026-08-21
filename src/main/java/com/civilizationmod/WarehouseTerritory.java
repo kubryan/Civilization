@@ -190,11 +190,20 @@ public record WarehouseTerritory(
         return readPoint(payload, POINT_B_X_KEY, POINT_B_Y_KEY, POINT_B_Z_KEY, MAX_X_KEY, MAX_Y_KEY, MAX_Z_KEY);
     }
 
-    public static boolean isCompleted(ItemStack stack) {
+        public static boolean isCompleted(ItemStack stack) {
         return read(stack).isPresent();
     }
 
+    /** Copies the complete server-authored marker data without changing the target item type. */
+    public static void copyCustomData(ItemStack source, ItemStack target) {
+        if (source == null || source.isEmpty() || target == null || target.isEmpty()) {
+            return;
+        }
+        target.set(DataComponents.CUSTOM_DATA, CustomData.of(customData(source).copyTag()));
+    }
+
     public static void clearPendingSelection(ItemStack stack) {
+
         CompoundTag current = customData(stack).copyTag();
         current.remove(DATA_KEY);
         if (current.isEmpty()) {

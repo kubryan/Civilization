@@ -3223,3 +3223,68 @@ building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已
 ### 下一步
 
 進入遊戲後在創造模式物品欄或以配方取得四種 marker，並將它們放在 ItemFrame 中比較：確認 1／2／4／6 的床墊色彩與金色數字能快速區分，且 warehouse marker 仍維持箱子外觀。之後可再為住宅 marker 增加 tooltip 的容量與即時床位摘要，讓圖示辨識與 server-side 容量規則互相補強。
+
+
+## 2026-08-21 — 住宅重開恢復、住宅綁定裝置與互動修正
+
+### 變更
+
+本次先處理玩家住宅驗收第 5 項失敗，以及三個題外互動問題。唯讀檢查最近測試世界 `run/saves/新的世界/dimensions/minecraft/overworld/data/civilizationmod/civilization_world.dat` 後，確認 `schema_version=6`、住宅 observation 同時保存 `resident_uuid` 與 `residents` roster；因此目前證據不支持「roster Codec 完全沒有保存」這個判斷，修正重點改為重開後的角色恢復、validation gate 與互動查找。
+
+新增 `residence_binding_device`。玩家蹲下右鍵有效住宅 marker 的 ItemFrame，裝置會由 server 驗證 building observation、住宅功能、有效狀態、目前 marker 與即時床位後保存選取的維度與 marker 座標；之後手持同一裝置右鍵任意可用原版 Villager，即可在不注視特定住宅村民的情況下完成 roster 綁定。裝置不消耗，使用 `/give @p civilizationmod:residence_binding_device` 取得；本次尚未新增正式合成配方。
+
+新增 `/civitas unassign <building_index> [villager]`，`/civilization` 共用相同命令樹與 Tab completion。省略 villager 時使用玩家視線選取；明確指定時 server 限制目標必須是同維度原版 Villager。解除後只移除指定 UUID；若村民沒有其他 Civitas building assignment，才清除帶 `civitas_role` 的角色胸甲。
+
+修正模組村民背包互動：已保存 roster 的 Villager 不再因住宅暫時被標記為 invalid 就被背包 server gate 擋住。`BuildingResidentService` 也會對保存 roster 的村民重新套用 Civitas 角色外套；invalid 建築只停止導航與物流，不阻止居民恢復外觀與背包管理。
+
+修正蹲下右鍵快速放置 marker：若手持同類 marker 沒有完成 territory，server 會在玩家 inventory 中尋找同類且帶完成 `WarehouseTerritory` 的 stack，複製完整 CustomData 後再將 marker 放入空 ItemFrame，並消耗實際帶有 territory 的來源 stack。轉移仍保留原 item type、territory、A/B 點與其他 CustomData，不會只建立遺失資料的新 ItemStack。
+
+新增住宅綁定裝置的 16×16 RGBA item texture 與 `minecraft:item/generated` model。圖示使用金色連結環、紫色核心與床形符號，與 warehouse 箱子輪廓及 residential marker 床位數字圖示區分。三份 locale 新增裝置名稱、tooltip、選取／綁定結果、失敗原因與 unassign 訊息。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceData.java`：保存裝置選取的維度與 marker 座標。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceItem.java`：裝置物品與 tooltip。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：server-authoritative ItemFrame 選取與 Villager 綁定。
+- `src/main/java/com/civilizationmod/CivilizationItems.java`：註冊住宅綁定裝置與 interaction。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：新增 `unassign` 命令。
+- `src/main/java/com/civilizationmod/BuildingObservation.java`：新增指定 UUID roster 移除 helper。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：重開／invalid 狀態下仍恢復角色外套。
+- `src/main/java/com/civilizationmod/BuildingRoleEquipment.java`：新增安全清除 Civitas 角色胸甲 helper。
+- `src/main/java/com/civilizationmod/CivitasVillagerInteraction.java`、`CivitasVillagerBackpackMenu.java`：放寬已保存 roster 的背包 gate。
+- `src/main/java/com/civilizationmod/WarehouseMarkerQuickDeploy.java`、`WarehouseTerritory.java`：加入同類 marker inventory territory fallback 與 CustomData 複製。
+- `src/main/resources/assets/civilizationmod/models/item/residence_binding_device.json`：裝置 item model。
+- `src/main/resources/assets/civilizationmod/textures/item/residence_binding_device.png`：16×16 裝置貼圖。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`、`zh_tw.json`、`zh_cn.json`：同步新增玩家可見文字。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`、`.cursor/skills/civitas-fabric-262/SKILL.md` 與全域 skill：同步寫入 API 與互動修正規則。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- API 查證：使用 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `javap` 確認 `Player.getInventory()`、`Inventory.getContainerSize()`、`Inventory.getItem(int)`；CustomData 與既有 `WarehouseTerritory` component 寫法沿用已查證模式。
+- 世界資料診斷：確認最近測試世界的 SavedData 為 schema 6，且住宅 roster 實際存在於 NBT；未直接修改玩家世界存檔。
+- 命令：`gradlew.bat --no-daemon compileJava --console=plain`；結果：`BUILD SUCCESSFUL`。
+- 命令：`gradlew.bat --no-daemon clean build --console=plain`；結果：`BUILD SUCCESSFUL`。
+- 命令：`gradlew.bat --no-daemon runFoodModelRegressionTest --console=plain`；結果：`FoodModelRegressionTest: PASS`。
+- 命令：`gradlew.bat --no-daemon runClient --console=plain`；結果：client 完成 Fabric／Mixin／texture atlas／Render thread 初始化，未見本次新物品或 interaction 導致的致命錯誤；Realms 授權訊息屬開發環境登入服務訊息，測試完成後已停止 client。
+- `git diff --check`：未發現 whitespace 錯誤；本次暫存 javap 輸出已清理。
+
+### 未完成與風險
+
+- 玩家尚未在修正後的實際世界重新驗收「退出世界、重開後 `/civitas building inspect`、背包與角色外套仍可用」；目前只確認 SavedData NBT 原本已保存 roster，並完成 server／client gate 與角色恢復修正。
+- 住宅綁定裝置本次尚未有正式合成配方，也尚未加入專用 creative tab；可先使用 `/give` 測試。
+- 快速放置的 inventory fallback 會尋找同一 item type 的第一個已完成 territory stack；若玩家同時持有多個不同領地的同類 marker，最好直接手持已完成的目標 marker，以避免消耗背包中另一個領地來源。這是便利 fallback，不改變 server 的 territory、維度、附著牆與 duplicate 驗證。
+- 綁定裝置目前只支援原版 Villager，沒有把其他模組 NPC 當作硬依賴或自動納入。
+
+### 下一步
+
+- 使用 `/give @p civilizationmod:residence_binding_device` 實測兩步綁定流程。
+- 重開世界後重新驗收住宅 roster、背包、角色外套與 `/civitas building inspect`。
+- 測試 `/civitas unassign` 是否釋放容量且不清除其他建築的角色狀態。
+- 依實測結果決定住宅綁定裝置的正式合成配方，之後再開始市政廳 marker 設計。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/events — Fabric Events 26.2。
+- [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions。
+- [3] 本機 Minecraft 26.2 common jar：`C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`，`javap` 查證日期 2026-08-21。

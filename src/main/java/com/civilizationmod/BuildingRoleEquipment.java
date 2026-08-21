@@ -28,7 +28,15 @@ public final class BuildingRoleEquipment {
         villager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, roleCoat);
     }
 
+        public static void clearIfCivitasRole(Villager villager) {
+        ItemStack chest = villager.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+        if (isCivitasRole(chest)) {
+            villager.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, ItemStack.EMPTY);
+        }
+    }
+
     public static boolean isWarehouseRole(ItemStack stack) {
+
         if (stack == null || stack.isEmpty()) {
             return false;
         }

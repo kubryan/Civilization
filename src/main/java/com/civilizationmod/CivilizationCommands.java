@@ -58,8 +58,10 @@ public final class CivilizationCommands {
 					.then(Commands.literal("status").executes(context -> status(context.getSource())))
 					.then(settlementCommand())
                         .then(buildingCommand())
-                        .then(assignCommand())
+                                                .then(assignCommand())
+                        .then(unassignCommand())
                         .then(simulateCommand())
+
 					.then(scanCommand("scan"))
 					.then(scanCommand("sc"));
 		}
@@ -90,7 +92,23 @@ public final class CivilizationCommands {
                                                 EntityArgument.getEntity(context, "villager")))));
         }
 
+                private static LiteralArgumentBuilder<CommandSourceStack> unassignCommand() {
+                return Commands.literal("unassign")
+                        .then(Commands.argument("building_index", IntegerArgumentType.integer(1))
+                                .suggests(CivilizationCommands::suggestBuildingIndex)
+                                .executes(context -> unassignResident(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "building_index"),
+                                        null))
+                                .then(Commands.argument("villager", EntityArgument.entity())
+                                        .executes(context -> unassignResident(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "building_index"),
+                                                EntityArgument.getEntity(context, "villager")))));
+        }
+
         private static LiteralArgumentBuilder<CommandSourceStack> simulateCommand() {
+
 		return Commands.literal("simulate")
 				.executes(context -> simulate(context.getSource(), DEFAULT_SIMULATION_STEPS))
 				.then(Commands.argument("steps", IntegerArgumentType.integer(MIN_SIMULATION_STEPS, MAX_SIMULATION_STEPS))
@@ -624,6 +642,70 @@ public final class CivilizationCommands {
                         index,
                         villager.getName(),
                         villager.getStringUUID()), false);
+                return 1;
+        }
+
+        private static int unassignResident(CommandSourceStack source, int index, Entity explicitTarget)
+                throws CommandSyntaxException {
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                BuildingObservation building = data.getBuilding(index);
+                if (building == null) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.invalid_building",
+                                index,
+                                data.getBuildingCount()), false);
+                        return 0;
+                }
+
+                ServerLevel level = source.getLevel();
+                Villager villager;
+                if (explicitTarget != null) {
+                        if (!(explicitTarget instanceof Villager candidate)) {
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.unassign.target_not_villager"), false);
+                                return 0;
+                        }
+                        if (candidate.level() != level) {
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.assign.target_wrong_dimension"), false);
+                                return 0;
+                        }
+                        villager = candidate;
+                } else {
+                        ServerPlayer player = source.getPlayer();
+                        if (player == null) {
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.assign.requires_player"), false);
+                                return 0;
+                        }
+                        villager = BuildingResidentService.findLookedAtVillager(level, player);
+                        if (villager == null) {
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.assign.villager_not_found"), false);
+                                return 0;
+                        }
+                }
+
+                if (!building.hasResident(villager.getUUID())) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.not_assigned",
+                                villager.getName()), false);
+                        return 0;
+                }
+
+                BuildingObservation replacement = building.withoutResident(villager.getUUID());
+                if (!data.replaceBuilding(building, replacement)) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.save_failed"), false);
+                        return 0;
+                }
+                if (data.findBuildingAssignedTo(villager.getStringUUID()) == null) {
+                        BuildingRoleEquipment.clearIfCivitasRole(villager);
+                }
+                source.sendSuccess(() -> CivilizationMessages.translatable(
+                        "civilizationmod.command.unassign.success",
+                        villager.getName(),
+                        index), false);
                 return 1;
         }
 

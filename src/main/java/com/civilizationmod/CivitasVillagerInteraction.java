@@ -53,8 +53,7 @@ public final class CivitasVillagerInteraction {
 
         BuildingObservation building = CivilizationWorldData.get(serverLevel.getServer())
                 .findBuildingAssignedTo(villager.getUUID().toString());
-        if (building == null
-                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+        if (building == null) {
             return InteractionResult.PASS;
         }
 

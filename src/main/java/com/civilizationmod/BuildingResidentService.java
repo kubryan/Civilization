@@ -90,13 +90,14 @@ public final class BuildingResidentService {
         }
 
         for (int index = 1; index <= data.getBuildingCount(); index++) {
-            BuildingObservation building = data.getBuilding(index);
-            if (building == null
-                    || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                        BuildingObservation building = data.getBuilding(index);
+            if (building == null) {
                 continue;
             }
+            boolean buildingValid = BuildingObservation.VALIDATION_VALID.equals(building.validationStatus());
 
             ServerLevel buildingLevel = findLevel(server, building.dimension());
+
             if (buildingLevel == null) {
                 continue;
             }
@@ -116,6 +117,9 @@ public final class BuildingResidentService {
                 }
 
                 applyAssignmentVisual(villager, building.functionId());
+                if (!buildingValid) {
+                    continue;
+                }
                 if (villager.distanceToSqr(marker.getX() + 0.5D, marker.getY(), marker.getZ() + 0.5D)
                         > ARRIVAL_DISTANCE_SQUARED) {
                     villager.getNavigation().moveTo(

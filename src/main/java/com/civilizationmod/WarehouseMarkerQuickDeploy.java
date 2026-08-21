@@ -46,8 +46,22 @@ public final class WarehouseMarkerQuickDeploy {
             return InteractionResult.FAIL;
         }
 
-        ItemStack handStack = player.getItemInHand(hand);
+                ItemStack handStack = player.getItemInHand(hand);
+        ItemStack territorySource = handStack;
         Optional<WarehouseTerritory> territory = WarehouseTerritory.read(handStack);
+        if (territory.isEmpty()) {
+            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                ItemStack candidate = player.getInventory().getItem(slot);
+                if (candidate.getItem() == handStack.getItem()) {
+                    Optional<WarehouseTerritory> candidateTerritory = WarehouseTerritory.read(candidate);
+                    if (candidateTerritory.isPresent()) {
+                        territorySource = candidate;
+                        territory = candidateTerritory;
+                        break;
+                    }
+                }
+            }
+        }
         if (territory.isEmpty()) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.building.deploy.incomplete"));
@@ -55,6 +69,7 @@ public final class WarehouseMarkerQuickDeploy {
         }
 
         WarehouseTerritory value = territory.get();
+
         if (!value.dimension().equals(serverLevel.dimension().identifier().toString())) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.building.deploy.wrong_dimension"));
@@ -76,9 +91,11 @@ public final class WarehouseMarkerQuickDeploy {
             return InteractionResult.FAIL;
         }
 
-        ItemStack transferred = handStack.copyWithCount(1);
+                ItemStack transferred = handStack.copyWithCount(1);
+        WarehouseTerritory.copyCustomData(territorySource, transferred);
         frame.setItem(transferred, false);
-        handStack.shrink(1);
+        territorySource.shrink(1);
+
         BuildingMarkerVisualState.apply(frame, true);
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.building.deploy.success"));

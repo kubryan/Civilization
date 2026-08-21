@@ -39,19 +39,29 @@ public final class CivilizationItems {
             new Item.Properties().stacksTo(1)
     );
 
-    public static final ResourceKey<Item> RESIDENTIAL_MARKER_6_KEY = itemKey("residential_marker_6");
+        public static final ResourceKey<Item> RESIDENTIAL_MARKER_6_KEY = itemKey("residential_marker_6");
     public static final Item RESIDENTIAL_MARKER_6 = register(
             RESIDENTIAL_MARKER_6_KEY,
             ResidentialMarkerItem::new,
             new Item.Properties().stacksTo(1)
     );
 
+    public static final ResourceKey<Item> RESIDENCE_BINDING_DEVICE_KEY = itemKey("residence_binding_device");
+    public static final Item RESIDENCE_BINDING_DEVICE = register(
+            RESIDENCE_BINDING_DEVICE_KEY,
+            ResidenceBindingDeviceItem::new,
+            new Item.Properties().stacksTo(1)
+    );
+
     private CivilizationItems() {
+
     }
 
     public static void initialize() {
-        BuildingMarkerRegistry.registerDefaults();
+                BuildingMarkerRegistry.registerDefaults();
         CivitasBuildingMarkerItem.registerSelectionCallback();
+        ResidenceBindingDeviceInteraction.register();
+
     }
 
     private static ResourceKey<Item> itemKey(String name) {

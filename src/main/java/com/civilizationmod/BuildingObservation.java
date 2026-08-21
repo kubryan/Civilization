@@ -484,7 +484,20 @@ public record BuildingObservation(
     }
 
     public BuildingObservation withoutResident() {
-        return withResident(null, "");
+        return withResidents(List.of());
+    }
+
+    public BuildingObservation withoutResident(UUID uuid) {
+        if (uuid == null) {
+            return this;
+        }
+        String targetUuid = uuid.toString();
+        List<ResidentAssignment> remaining = this.residents.stream()
+                .filter(resident -> !targetUuid.equals(resident.uuid()))
+                .toList();
+        return remaining.size() == this.residents.size()
+                ? this
+                : withResidents(remaining);
     }
 
     public BuildingObservation withStorageSnapshot(BuildingStorageSnapshot snapshot) {

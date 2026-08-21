@@ -448,3 +448,14 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 每個容量版本維持自己的 item model JSON，使用已驗證可載入的 `minecraft:item/generated` parent，並讓 `textures.layer0` 分別指向 `civilizationmod:item/residential_marker_1`、`_2`、`_4`、`_6`。目前不需要額外 override、client renderer 或 model loader；視覺差異由各自 PNG 提供，保持 common 資源與 server/client 邊界簡單。
 
 驗證：PNG IHDR 四者皆為 `16×16`、color type `6`（RGBA）；四個 model 的 layer0 皆指向各自專用貼圖；`clean build` 與 `runClient` smoke test 通過。
+
+
+## 住宅綁定裝置、重開恢復與互動修正（2026-08-21）
+
+- 已用 Minecraft 26.2 common jar `javap` 確認 `Player.getInventory()`、`Inventory.getContainerSize()`、`Inventory.getItem(int)` 可用於 server-side 掃描玩家背包；快速部署可在手持同類 marker 沒有完成 territory 時，尋找背包內同類且帶完成 `WarehouseTerritory` 的 stack，將其 `DataComponents.CUSTOM_DATA` 複製到轉入 ItemFrame 的 stack，再消耗實際資料來源 stack。不可重建只含 item identity 的 marker。
+- `DataComponents.CUSTOM_DATA`、`CustomData.copyTag()`、`CustomData.of(CompoundTag)` 與既有 `WarehouseTerritory` 寫法可用來保存住宅綁定裝置選取的維度與 marker 座標。綁定裝置的 server interaction 必須先確認 ItemFrame 內為住宅 marker、building observation 存在且有效，再以 `ResidenceValidator.validate(...)` 即時重驗證領地與床位，最後才將 villager UUID 加入 `BuildingObservation.residents`。
+- 住宅居民 roster 的 Codec round-trip 與最近世界的 `civilization_world.dat` 已確認能保存 `schema_version=6`、`resident_uuid` 與 `residents`；若重開後玩家看不到模組效果，優先檢查 role visual reapply、building validation gate 與 `findBuildingAssignedTo`，不要先重寫 roster Codec。`BuildingResidentService` 必須對保存 roster 的村民重新套用角色外套；invalid 建築可以停止導航／物流，但不應阻止保存的居民恢復外觀與背包管理。
+- `UseEntityCallback` 的 binding device 應在 common initializer 先註冊，讓蹲下右鍵有效住宅 ItemFrame 保存選取，之後右鍵 Villager 完成 server-authoritative binding。裝置目前為單件 stack；是否新增配方另行設計，開發驗收可用 `/give @p civilizationmod:residence_binding_device`。
+- 新增 `/civitas unassign <building_index> [villager]` 與 `/civilization` 相容別名時，沿用既有 building index suggestions、`EntityArgument.entity()`、server 維度／Villager 類型驗證與 `BuildingObservation.withoutResident(UUID)`；解除後只有在村民沒有其他 Civitas building assignment 時才清除帶 `civitas_role` 的角色胸甲。
+
+查證來源：本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `javap`（2026-08-21）；Fabric 26.2 Events 文件：https://docs.fabricmc.net/develop/events；Fabric 26.2 Items 文件：https://docs.fabricmc.net/develop/items/custom-item-interactions。

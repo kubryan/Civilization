@@ -348,3 +348,14 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：共同使用側視床輪廓，容量數字 1／2／4／6 加上階級色彩區分；正式圖示保留一像素透明外框。視覺差異由 PNG 提供，不增加 client renderer 或 model loader。
 - 禁止：住宅 marker 不得重用 warehouse 的箱子／容器紋理，也不要為簡單 item icon 猜測或引入未查證的 model override API。
 - 查證：正式專案四個 PNG 的 IHDR 均為 `16×16`、color type `6` RGBA；四個 model 的 layer0 均指向各自貼圖；`clean build` 與 `runClient` smoke test 通過。日期 2026-08-21。
+
+
+## 2026-08-21 — 住宅綁定裝置與重開後互動恢復
+
+- 任務：修正住宅 roster 重開後看似失效，並新增住宅綁定裝置、解除指派與快速放置 fallback。
+- 已確認：Minecraft 26.2 common jar 的 `Player.getInventory()`、`Inventory.getContainerSize()`、`Inventory.getItem(int)` 可供 server-side inventory 掃描；`DataComponents.CUSTOM_DATA`、`CustomData.copyTag()`、`CustomData.of(CompoundTag)` 可保存與複製 ItemStack CustomData。
+- 採用：住宅綁定裝置以 `UseEntityCallback` 先蹲下右鍵有效住宅 ItemFrame 保存維度與 marker 座標，再右鍵 Villager 由 server 重新驗證 building、territory、床位與容量後加入 roster。開發測試可用 `/give @p civilizationmod:residence_binding_device`。
+- 採用：若手持同類 marker 沒有完成 territory，快速部署可從玩家 inventory 找到同類且帶完成 `WarehouseTerritory` 的 stack，複製完整 CustomData 後再消耗實際資料來源；不可重建只含 item identity 的 marker。
+- 採用：`BuildingResidentService` 對保存 roster 的村民重新套用角色外套；invalid 建築只停止導航／物流，不阻止外觀與背包管理。新增 `/civitas unassign <building_index> [villager]`，相容 `/civilization`，沿用 suggestions 與 `EntityArgument.entity()`。
+- 禁止：不要因 SavedData NBT 已含 `resident_uuid`／`residents` 就先重寫 roster Codec；重開後失效優先查 role reapply、validation gate 與 `findBuildingAssignedTo`。不要用未查證的 ItemFrame 專用事件或猜測 inventory 欄位。
+- 查證：本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 javap；Fabric Events：https://docs.fabricmc.net/develop/events；Fabric Custom Item Interactions：https://docs.fabricmc.net/develop/items/custom-item-interactions；日期 2026-08-21。
