@@ -1,0 +1,17 @@
+{
+	"required": true,
+	"package": "com.civilizationmod.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+		"client": [
+			"ExampleClientMixin",
+			"LivingEntityRendererAccessor",
+			"VillagerRenderStateMixin",
+			"VillagerRendererMixin"
+		],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
