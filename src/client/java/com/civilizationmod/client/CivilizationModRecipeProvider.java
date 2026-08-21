@@ -38,7 +38,7 @@ public final class CivilizationModRecipeProvider extends FabricRecipeProvider {
                         .unlockedBy(getHasName(Items.CHEST), has(Items.CHEST))
                         .save(output);
 
-                    shaped(RecipeCategory.MISC, CivilizationItems.RESIDENCE_BINDING_DEVICE)
+                    shaped(RecipeCategory.MISC, CivilizationItems.CIVITAS_BINDING_DEVICE)
                         .pattern("sss")
                         .pattern("sis")
                         .pattern("sss")

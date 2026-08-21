@@ -3583,3 +3583,51 @@ Dedicated server 尚未完成實際啟動驗證，原因是 `run/eula.txt` 尚�
 - [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions 26.2。
 - [3] https://maven.fabricmc.net/docs/fabric-api-0.158.0+26.2/net/fabricmc/fabric/api/event/player/AttackEntityCallback.html — AttackEntityCallback API。
 - [4] 本機 Minecraft 26.2 common jar 與 Fabric API 0.158.0+26.2 jar javap，日期 2026-08-21。
+
+
+## 2026-08-21 — 通用 Civitas 綁定裝置與蹲下右鍵空氣快速部署
+
+### 變更摘要
+
+本次將原本住宅專用的綁定流程升級為 **Civitas 綁定裝置**。新的正式物品 ID 是 `civilizationmod:civitas_binding_device`，可選取並綁定所有已知且有效的 Civitas 建築標誌，包括 warehouse、residence 與 Town Hall。原本的 `civilizationmod:residence_binding_device` 不移除，而是保留為 legacy registry ID，改由 `ResidenceBindingDeviceItem` 繼承通用 `CivitasBindingDeviceItem`，使既有世界與玩家持有的舊物品仍可使用通用綁定行為，不因改名而失效。新配方輸出通用 ID，未來新取得的裝置統一使用 Civitas 品牌。
+
+`ResidenceBindingDeviceData` 的資料 key 從住宅專用的 `civitas_residence_binding` 通用化為 `civitas_binding`；讀取時仍保留舊 key fallback，座標 schema 與兩步綁定流程不變。住宅 marker 綁定仍會即時重新驗證 territory、床位與容量，避免只因裝置通用化而跳過住宅規則；warehouse 與 Town Hall 沿用既有 `BuildingResidentService` 的單一綁定語義，沒有擅自引入尚未設計的容量規則。
+
+蹲下右鍵空氣的快速部署也已補上。直接右鍵空 ItemFrame 的路徑仍由 `UseEntityCallback` 處理；蹲下右鍵空氣則由 Fabric API 0.158.0+26.2 已查證存在的 `UseItemCallback.EVENT` 接收，再以玩家眼睛位置、視線向量、AABB、dot product alignment、line-of-sight 與最近距離尋找視線中的空 ItemFrame。找到後共用原本的 server-side `deployToFrame` 驗證，包含維度、已完成 territory、ItemFrame 牆面附著、重複 marker、CustomData 轉移與玩家背包 fallback。快速部署接受 warehouse 與 residence territory marker，仍排除不屬於 territory 的 Town Hall marker；未完成 territory 時會保留本地化錯誤訊息且不修改 ItemFrame。
+
+### 影響檔案
+
+| 類別 | 檔案與內容 |
+|---|---|
+| 通用物品 | `src/main/java/com/civilizationmod/CivitasBindingDeviceItem.java`：新增通用綁定裝置基類與 tooltip。 |
+| Registry／相容 | `src/main/java/com/civilizationmod/CivilizationItems.java`：註冊 `CIVITAS_BINDING_DEVICE` 並保留 legacy `RESIDENCE_BINDING_DEVICE`；`src/main/java/com/civilizationmod/ResidenceBindingDeviceItem.java`：改為通用 subclass。 |
+| 綁定流程 | `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：選取所有有效 Civitas marker，住宅保留床位與容量驗證；`src/main/java/com/civilizationmod/ResidenceBindingDeviceData.java`：使用新 NBT key 並支援舊 key fallback。 |
+| 空氣快速部署 | `src/main/java/com/civilizationmod/WarehouseMarkerQuickDeploy.java`：新增 `UseItemCallback` air path、視線 ItemFrame 選取與 warehouse／residence territory 過濾，並與直接 ItemFrame path 共用部署邏輯。 |
+| 配方／資料生成 | `src/main/java/com/civilizationmod/CivilizationModRecipeProvider.java`、`src/client/java/com/civilizationmod/client/CivilizationModRecipeProvider.java`：配方輸出通用 ID；新增 `src/main/generated/data/civilizationmod/recipe/civitas_binding_device.json` 與對應 recipe advancement。舊 residence recipe generated output 已移除。 |
+| 資產／本地化 | `src/main/resources/assets/civilizationmod/items/civitas_binding_device.json`、`models/item/civitas_binding_device.json`、`textures/item/civitas_binding_device.png`；`en_us.json`、`zh_tw.json`、`zh_cn.json` 同步通用裝置文案。 |
+| 技能文件 | `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md` 與全域 `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md` 已追加 API 查證與設計規則。 |
+| 進度記錄 | `Mods.md`：本節為本次 canonical 開發紀錄。 |
+
+### API 查證
+
+本次沒有猜測 Fabric 26.2 API。已以 Fabric API `0.158.0+26.2` 實際 jar 的 `javap` 確認 `net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT` 與 callback `interact(Player, Level, InteractionHand)`；它正好用於補足「右鍵空氣」不會走直接實體互動 callback 的情境。視線選取沿用專案中已驗證的 `getEyePosition`、`getViewVector`、AABB、dot product 與 `hasLineOfSight` 模式。官方文件參考為 [Fabric Events 26.2](https://docs.fabricmc.net/develop/events) 與 [Custom Item Interactions 26.2](https://docs.fabricmc.net/develop/items/custom-item-interactions)。
+
+### 驗證結果
+
+| 驗證項目 | 結果 |
+|---|---|
+| `runFoodModelRegressionTest` | `FoodModelRegressionTest: PASS`。 |
+| `gradlew.bat compileJava compileClientJava build --console=plain` | `BUILD SUCCESSFUL`；common、client、resources、jar、assemble 與 build 通過。 |
+| `gradlew.bat runDatagen --console=plain` | `BUILD SUCCESSFUL`；生成通用綁定裝置 recipe 與 advancement。 |
+| `gradlew.bat runClient --console=plain` | smoke test 已確認 Fabric Loader、Minecraft 26.2、Render thread、Indigo、texture atlas、registry 與 client initialization 成功；測試完成後手動停止執行中的 client，未將 Realms 授權提示視為模組錯誤。 |
+| `git diff --check` | 無程式碼 whitespace error；Windows Git 僅提示部分檔案的 LF／CRLF 轉換警告。 |
+
+### 尚未完成與風險
+
+本次尚未完成遊戲內人工驗收，因此仍需確認玩家實際蹲下右鍵有效 warehouse／residence marker、空氣視線選取最近空 ItemFrame、通用裝置右鍵村民綁定，以及舊 `residence_binding_device` 在既有存檔中的相容性。視線 dot threshold `0.92` 與搜尋 AABB `16` 格是目前互動實作參數，後續若玩家回報遠距離或斜角選取體驗不佳，再以實際遊戲行為調整，不以猜測 API 的方式處理。
+
+Town Hall 目前可以被通用裝置選取，但 territory 快速部署刻意排除 Town Hall；市政廳的下一個主線仍是將 warehouse／residence 綁定到同維度、核心半徑 64 內的 `colony_id`，並處理核心不存在或超出範圍時的未綁定狀態。配方、居民上限與殖民地解鎖規則應等市政廳歸屬閉環驗收後再設計。
+
+### 下一步
+
+請在遊戲內先使用 `/give @p civilizationmod:civitas_binding_device`，分別對有效 warehouse 與 residence marker 蹲下右鍵選取，再右鍵村民確認綁定；另以 `/give @p civilizationmod:residence_binding_device` 驗證 legacy 物品仍然可用。接著手持已完成 territory 的 warehouse 或 residence marker，對視線中的空 ItemFrame 蹲下右鍵空氣，確認 marker 被消耗並轉移到 ItemFrame。市政廳則以 `/civitas building scan` 與 `/civitas townhall` 驗證核心登記後，進入「市政廳殖民地歸屬切片」。

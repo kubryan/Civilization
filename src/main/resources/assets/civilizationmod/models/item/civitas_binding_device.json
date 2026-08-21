@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "civilizationmod:item/civitas_binding_device"
+  }
+}

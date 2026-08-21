@@ -1,6 +1,7 @@
 package com.civilizationmod;
 
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -12,7 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.EntityHitResult;
 
-/** Server-authoritative two-step residence binding workflow. */
+/** Server-authoritative two-step binding workflow for every Civitas building marker. */
 public final class ResidenceBindingDeviceInteraction {
     private ResidenceBindingDeviceInteraction() {
     }
@@ -30,7 +31,7 @@ public final class ResidenceBindingDeviceInteraction {
     ) {
         if (hand != InteractionHand.MAIN_HAND
                 || player.isSpectator()
-                || !(player.getItemInHand(hand).getItem() instanceof ResidenceBindingDeviceItem)) {
+                || !(player.getItemInHand(hand).getItem() instanceof CivitasBindingDeviceItem)) {
             return InteractionResult.PASS;
         }
 
@@ -43,7 +44,7 @@ public final class ResidenceBindingDeviceInteraction {
 
         ItemStack device = player.getItemInHand(hand);
         if (entity instanceof ItemFrame frame) {
-            return selectResidence(serverLevel, player, device, frame);
+            return selectBuilding(serverLevel, player, device, frame);
         }
         if (entity instanceof Villager villager) {
             return bindResident(serverLevel, player, device, villager);
@@ -51,7 +52,7 @@ public final class ResidenceBindingDeviceInteraction {
         return InteractionResult.PASS;
     }
 
-    private static InteractionResult selectResidence(
+    private static InteractionResult selectBuilding(
             ServerLevel level,
             Player player,
             ItemStack device,
@@ -61,11 +62,13 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.PASS;
         }
         ItemStack markerStack = frame.getItem();
-        if (!BuildingFunction.RESIDENCE.id().equals(BuildingMarkerRegistry.functionId(markerStack))) {
+        String functionId = BuildingMarkerRegistry.functionId(markerStack);
+        if (BuildingMarkerRegistry.FUNCTION_UNKNOWN.equals(functionId)) {
             player.sendSystemMessage(CivilizationMessages.translatable(
-                    "civilizationmod.binding.select.not_residence"));
+                    "civilizationmod.binding.select.not_marker"));
             return InteractionResult.FAIL;
         }
+
         CivilizationWorldData data = CivilizationWorldData.get(level.getServer());
         BuildingObservation building = data.findBuilding(
                 level.dimension().identifier().toString(),
@@ -86,10 +89,10 @@ public final class ResidenceBindingDeviceInteraction {
                 frame.blockPosition());
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.binding.select.success",
+                functionName(functionId),
                 frame.blockPosition().getX(),
                 frame.blockPosition().getY(),
-                frame.blockPosition().getZ(),
-                building.capacity()));
+                frame.blockPosition().getZ()));
         return InteractionResult.SUCCESS;
     }
 
@@ -123,29 +126,43 @@ public final class ResidenceBindingDeviceInteraction {
                 selected.markerY(),
                 selected.markerZ());
         if (building == null
-                || !BuildingFunction.RESIDENCE.id().equals(building.functionId())
                 || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.binding.bind.invalid_building"));
             return InteractionResult.FAIL;
         }
+
         ItemFrame markerFrame = data.findBuildingMarker(level, building);
-        WarehouseTerritory territory = markerFrame == null
-                ? null
-                : WarehouseTerritory.read(markerFrame.getItem()).orElse(null);
-        if (markerFrame == null || territory == null) {
+        if (markerFrame == null
+                || !building.functionId().equals(BuildingMarkerRegistry.functionId(markerFrame.getItem()))) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.binding.bind.invalid_building"));
             return InteractionResult.FAIL;
         }
-        ResidenceValidator.Validation liveValidation = ResidenceValidator.validate(
-                level,
-                markerFrame,
-                building.capacity());
-        if (!liveValidation.isValid()) {
-            player.sendSystemMessage(CivilizationMessages.translatable(
-                    "civilizationmod.binding.bind.invalid_building"));
-            return InteractionResult.FAIL;
+
+        if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
+            WarehouseTerritory territory = WarehouseTerritory.read(markerFrame.getItem()).orElse(null);
+            ResidenceValidator.Validation liveValidation = ResidenceValidator.validate(
+                    level,
+                    markerFrame,
+                    building.capacity());
+            if (territory == null || !liveValidation.isValid()) {
+                player.sendSystemMessage(CivilizationMessages.translatable(
+                        "civilizationmod.binding.bind.invalid_building"));
+                return InteractionResult.FAIL;
+            }
+
+            if (liveValidation.bedCount() != building.bedCount()) {
+                BuildingObservation measured = building.withResidenceMeasurements(
+                        building.capacity(),
+                        liveValidation.bedCount());
+                if (!data.replaceBuilding(building, measured)) {
+                    player.sendSystemMessage(CivilizationMessages.translatable(
+                            "civilizationmod.command.assign.save_failed"));
+                    return InteractionResult.FAIL;
+                }
+                building = measured;
+            }
         }
 
         BuildingObservation existingAssignment = data.findBuildingAssignedTo(villager.getStringUUID());
@@ -164,7 +181,9 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.FAIL;
         }
 
-        if (!alreadyAssignedToTarget && building.residentCount() >= building.capacity()) {
+        if (BuildingFunction.RESIDENCE.id().equals(building.functionId())
+                && !alreadyAssignedToTarget
+                && building.residentCount() >= building.capacity()) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.command.assign.residence_full",
                     0,
@@ -173,12 +192,15 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.FAIL;
         }
 
-        BuildingObservation measured = building.withResidenceMeasurements(
-                building.capacity(),
-                liveValidation.bedCount());
-        BuildingObservation replacement = alreadyAssignedToTarget
-                ? measured
-                : measured.withAddedResident(villager.getUUID(), villager.getName().getString());
+        BuildingObservation replacement;
+        if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
+            replacement = alreadyAssignedToTarget
+                    ? building
+                    : building.withAddedResident(villager.getUUID(), villager.getName().getString());
+        } else {
+            replacement = building.withResident(villager.getUUID(), villager.getName().getString());
+        }
+
         if (!data.replaceBuilding(building, replacement)) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.command.assign.save_failed"));
@@ -187,9 +209,13 @@ public final class ResidenceBindingDeviceInteraction {
         BuildingResidentService.applyAssignmentVisual(villager, replacement.functionId());
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.binding.bind.success",
+                functionName(replacement.functionId()),
                 villager.getName(),
-                replacement.residentCount(),
-                replacement.capacity()));
+                replacement.residentCount()));
         return InteractionResult.SUCCESS;
+    }
+
+    private static Component functionName(String functionId) {
+        return Component.translatable("civilizationmod.building.function." + functionId);
     }
 }

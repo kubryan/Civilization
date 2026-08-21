@@ -427,3 +427,14 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：以 Fabric API 0.158.0+26.2 的 `AttackEntityCallback.EVENT` server-side 監聽 ItemFrame 被攻擊，在原版移除與掉落前複製 marker stack、只移除 `ENCHANTMENT_GLINT_OVERRIDE`，再以 `frame.setItem(updated, false)` 寫回，最後回傳 `PASS` 保留原版拆除、掉落與 CustomData。非 marker、無 glint、client、spectator 一律 PASS。
 - 禁止：不要取消 ItemFrame 攻擊、不要重建 marker item、不要清除 `CUSTOM_DATA` 或 territory；本次只修正視覺 glint。
 - 查證：26.2 common jar javap、Fabric events/custom interactions 文件與 Fabric API events-interaction jar；日期 2026-08-21。
+
+
+## 2026-08-21 — 通用 Civitas 綁定裝置與空氣右鍵快速部署
+
+- 正式通用物品 ID 採 `civitas_binding_device`，顯示名稱為 Civitas Binding Device／Civitas 綁定裝置。舊 `residence_binding_device` 不刪除，改由相容 subclass 提供相同通用行為與 tooltip，避免既有物品 stack／世界資料失效；新配方輸出正式通用 ID。
+- 綁定 CustomData schema 座標格式不變；新資料 key 使用 `civitas_binding`，讀取時 fallback 到舊 `civitas_residence_binding`，因此已選住宅資料可被新裝置繼續使用。
+- `ResidenceBindingDeviceInteraction` 已泛化為所有 `BuildingMarkerRegistry.isKnownMarker(...)` 的有效 building observation。住宅仍做即時 territory／床位檢查、容量與 roster append；warehouse／Town Hall 沿用 `/civitas assign` 的 single-resident overwrite 語義，不新增未設計的容量規則。
+- Fabric API 0.158.0+26.2 jar javap 確認 `UseItemCallback.EVENT` 與 `interact(Player, Level, InteractionHand)`。因此直接右鍵空 ItemFrame 繼續由 `UseEntityCallback` 處理；蹲下右鍵空氣新增 `UseItemCallback`，不能假設 UseEntityCallback 會在 air target 觸發。
+- 空氣快速部署沿用已編譯的 villager look-target 模式：server／client 先用 16 格 AABB，對 `ItemFrame.getBoundingBox().getCenter()` 與 `Player.getEyePosition` 計算方向 dot，門檻 0.92，再用 `Player.hasLineOfSight`，取最近的空 ItemFrame。最後共用 dimension、territory、牆面附著、重複 marker、CustomData copy 與背包 fallback server 驗證。
+- 快速部署現在接受 warehouse／residence territory marker，仍排除 Town Hall；未完成 territory 只回傳既有 localized incomplete message，不修改 ItemFrame。
+- 查證：Fabric Events／Custom Item Interactions 官方文件、Fabric API 0.158.0+26.2 jar javap、專案 `BuildingResidentService.findLookedAtVillager`；日期 2026-08-21。

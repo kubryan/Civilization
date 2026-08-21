@@ -1,32 +1,39 @@
 package com.civilizationmod;
 
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 
 /** Server-validated crouch-right-click transfer into an empty ItemFrame. */
 public final class WarehouseMarkerQuickDeploy {
+    private static final double LOOK_RANGE = 16.0D;
+    private static final double MIN_LOOK_DOT = 0.92D;
+
     private WarehouseMarkerQuickDeploy() {
     }
 
     public static void register() {
         UseEntityCallback.EVENT.register(WarehouseMarkerQuickDeploy::interact);
+        UseItemCallback.EVENT.register(WarehouseMarkerQuickDeploy::interactWithAir);
     }
 
     private static InteractionResult interact(
             Player player,
             Level level,
             InteractionHand hand,
-            Entity entity,
+            net.minecraft.world.entity.Entity entity,
             EntityHitResult hitResult
     ) {
         if (hand != InteractionHand.MAIN_HAND
@@ -35,9 +42,7 @@ public final class WarehouseMarkerQuickDeploy {
                 || !(entity instanceof ItemFrame frame)
                 || frame.getItem() == null
                 || !frame.getItem().isEmpty()
-                                || !BuildingFunction.WAREHOUSE.id().equals(
-                BuildingMarkerRegistry.functionId(player.getItemInHand(hand)))) {
-
+                || !BuildingMarkerRegistry.isTerritoryMarker(player.getItemInHand(hand))) {
             return InteractionResult.PASS;
         }
 
@@ -47,8 +52,36 @@ public final class WarehouseMarkerQuickDeploy {
         if (!(level instanceof ServerLevel serverLevel)) {
             return InteractionResult.FAIL;
         }
+        return deployToFrame(serverLevel, player, player.getItemInHand(hand), frame);
+    }
 
-                ItemStack handStack = player.getItemInHand(hand);
+    private static InteractionResult interactWithAir(Player player, Level level, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND
+                || !player.isShiftKeyDown()
+                || player.isSpectator()
+                || !BuildingMarkerRegistry.isTerritoryMarker(player.getItemInHand(hand))) {
+            return InteractionResult.PASS;
+        }
+
+        ItemFrame frame = findLookedAtEmptyItemFrame(level, player);
+        if (frame == null) {
+            return InteractionResult.PASS;
+        }
+        if (level.isClientSide()) {
+            return InteractionResult.SUCCESS;
+        }
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return InteractionResult.FAIL;
+        }
+        return deployToFrame(serverLevel, player, player.getItemInHand(hand), frame);
+    }
+
+    private static InteractionResult deployToFrame(
+            ServerLevel serverLevel,
+            Player player,
+            ItemStack handStack,
+            ItemFrame frame
+    ) {
         ItemStack territorySource = handStack;
         Optional<WarehouseTerritory> territory = WarehouseTerritory.read(handStack);
         if (territory.isEmpty()) {
@@ -71,7 +104,6 @@ public final class WarehouseMarkerQuickDeploy {
         }
 
         WarehouseTerritory value = territory.get();
-
         if (!value.dimension().equals(serverLevel.dimension().identifier().toString())) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.building.deploy.wrong_dimension"));
@@ -93,7 +125,7 @@ public final class WarehouseMarkerQuickDeploy {
             return InteractionResult.FAIL;
         }
 
-                ItemStack transferred = handStack.copyWithCount(1);
+        ItemStack transferred = handStack.copyWithCount(1);
         WarehouseTerritory.copyCustomData(territorySource, transferred);
         frame.setItem(transferred, false);
         territorySource.shrink(1);
@@ -104,13 +136,47 @@ public final class WarehouseMarkerQuickDeploy {
         return InteractionResult.SUCCESS;
     }
 
+    private static ItemFrame findLookedAtEmptyItemFrame(Level level, Player player) {
+        Vec3 eyePosition = player.getEyePosition(1.0F);
+        Vec3 viewVector = player.getViewVector(1.0F);
+        AABB searchBounds = new AABB(
+                player.getX() - LOOK_RANGE,
+                player.getY() - LOOK_RANGE,
+                player.getZ() - LOOK_RANGE,
+                player.getX() + LOOK_RANGE,
+                player.getY() + LOOK_RANGE,
+                player.getZ() + LOOK_RANGE);
+
+        ItemFrame nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (ItemFrame candidate : level.getEntities(
+                EntityTypeTest.forClass(ItemFrame.class),
+                searchBounds,
+                frame -> frame.getItem() != null && frame.getItem().isEmpty())) {
+            Vec3 towardCandidate = candidate.getBoundingBox().getCenter().subtract(eyePosition);
+            double distance = towardCandidate.length();
+            if (distance > LOOK_RANGE || distance < 0.001D) {
+                continue;
+            }
+            double alignment = towardCandidate.normalize().dot(viewVector);
+            if (alignment < MIN_LOOK_DOT || !player.hasLineOfSight(candidate)) {
+                continue;
+            }
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
     private static boolean hasOtherMarkerInTerritory(
             ServerLevel level,
             ItemFrame target,
             WarehouseTerritory territory
     ) {
         for (ItemFrame frame : level.getEntities(
-                net.minecraft.world.level.entity.EntityTypeTest.forClass(ItemFrame.class),
+                EntityTypeTest.forClass(ItemFrame.class),
                 territoryBounds(territory),
                 candidate -> candidate != target
                         && WarehouseTerritory.read(candidate.getItem())
@@ -121,8 +187,8 @@ public final class WarehouseMarkerQuickDeploy {
         return false;
     }
 
-    private static net.minecraft.world.phys.AABB territoryBounds(WarehouseTerritory territory) {
-        return new net.minecraft.world.phys.AABB(
+    private static AABB territoryBounds(WarehouseTerritory territory) {
+        return new AABB(
                 territory.minX(),
                 territory.minY(),
                 territory.minZ(),

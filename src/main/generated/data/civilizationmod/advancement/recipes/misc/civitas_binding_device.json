@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "civilizationmod:residence_binding_device"
+        "recipe": "civilizationmod:civitas_binding_device"
       },
       "trigger": "minecraft:recipe_unlocked"
     }
@@ -26,7 +26,7 @@
   ],
   "rewards": {
     "recipes": [
-      "civilizationmod:residence_binding_device"
+      "civilizationmod:civitas_binding_device"
     ]
   }
 }

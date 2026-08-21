@@ -8,7 +8,7 @@ import net.minecraft.world.item.component.CustomData;
 
 import java.util.Optional;
 
-/** Server-authored residential building reference carried by the binding device. */
+/** Server-authored Civitas building reference carried by the binding device. */
 public record ResidenceBindingDeviceData(
         int version,
         String dimension,
@@ -17,7 +17,8 @@ public record ResidenceBindingDeviceData(
         int markerZ
 ) {
     public static final int CURRENT_VERSION = 1;
-    private static final String DATA_KEY = "civitas_residence_binding";
+    private static final String DATA_KEY = "civitas_binding";
+    private static final String LEGACY_DATA_KEY = "civitas_residence_binding";
     private static final String VERSION_KEY = "version";
     private static final String DIMENSION_KEY = "dimension";
     private static final String MARKER_X_KEY = "marker_x";
@@ -33,7 +34,11 @@ public record ResidenceBindingDeviceData(
         if (stack == null || stack.isEmpty()) {
             return Optional.empty();
         }
-        CompoundTag payload = customData(stack).copyTag().getCompoundOrEmpty(DATA_KEY);
+        CompoundTag outer = customData(stack).copyTag();
+        CompoundTag payload = outer.getCompoundOrEmpty(DATA_KEY);
+        if (!hasSelection(payload)) {
+            payload = outer.getCompoundOrEmpty(LEGACY_DATA_KEY);
+        }
         String dimension = payload.getStringOr(DIMENSION_KEY, "");
         if (dimension.isBlank()
                 || !payload.contains(MARKER_X_KEY)
@@ -64,6 +69,13 @@ public record ResidenceBindingDeviceData(
 
     public BlockPos marker() {
         return new BlockPos(markerX, markerY, markerZ);
+    }
+
+    private static boolean hasSelection(CompoundTag payload) {
+        return payload.contains(DIMENSION_KEY)
+                && payload.contains(MARKER_X_KEY)
+                && payload.contains(MARKER_Y_KEY)
+                && payload.contains(MARKER_Z_KEY);
     }
 
     private static CustomData customData(ItemStack stack) {
