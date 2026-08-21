@@ -1,6 +1,8 @@
 package com.civilizationmod;
 
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -35,6 +37,22 @@ public final class BuildingResidentService {
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(BuildingResidentService::onEndServerTick);
+        ServerLivingEntityEvents.AFTER_DEATH.register(BuildingResidentService::onAfterDeath);
+    }
+
+    private static void onAfterDeath(net.minecraft.world.entity.LivingEntity entity,
+                                     net.minecraft.world.damagesource.DamageSource damageSource) {
+        if (!(entity instanceof Villager villager)
+                || !(entity.level() instanceof ServerLevel level)) {
+            return;
+        }
+        CivilizationWorldData data = CivilizationWorldData.get(level.getServer());
+        if (data.markResidentDead(villager.getUUID(), level.getGameTime())) {
+            CivilizationMod.LOGGER.info(
+                    "Resident body died: entityUuid={}, name={}; assignment released",
+                    villager.getUUID(),
+                    villager.getName().getString());
+        }
     }
 
     public static Villager findLookedAtVillager(ServerLevel level, ServerPlayer player) {

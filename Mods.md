@@ -4085,3 +4085,51 @@ test { useJUnitPlatform() }
 - [1] Fabric Saved Data 26.2：https://docs.fabricmc.net/develop/saved-data
 - [2] Fabric Commands 26.2：https://docs.fabricmc.net/develop/commands/basics
 - [3] Minecraft 26.2 common jar：`C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`，以 JDK 25 `javap` 查證，2026-08-21。
+
+
+## 2026-08-21 — 修正村民死亡後住宅容量未釋放
+
+### 根因
+
+使用者提供的 `latest.log` 已確認 server-side Villager 確實死亡，例如 `21:16:07`、`21:16:16` 與 `21:16:18`。原本 `BuildingResidentService` 對居民只執行導航與物流；當死亡 body 不再能被 lookup 時直接跳過，沒有更新 ResidentRecord lifecycle，也沒有從 `BuildingObservation.residents` 移除該 entity UUID。因此住宅仍計算死亡居民，容量不會釋放。latest.log 沒有出現 Civitas exception，問題是缺少死亡生命週期同步，而不是啟動或存檔錯誤。
+
+### 變更
+
+已由本機 Fabric API 0.158.0+26.2 的 `fabric-entity-events-v1` jar 查證 `ServerLivingEntityEvents.AFTER_DEATH` 與 `AfterDeath.afterDeath(LivingEntity, DamageSource)`，並在 common-side `BuildingResidentService.register()` 註冊 server death callback。callback 只處理 server-side 原版 Villager，避免 client/server 重複處理。
+
+新增 `CivilizationWorldData.markResidentDead(UUID, long)`。死亡時會將 ResidentRecord 的 lifecycle 設為 `dead`，保留 `residentId`、`entityUuid`、`colonyId` 與診斷名稱；同時清除 home building、work building 與 role，並從所有 `BuildingObservation.residents` roster 移除該 entity UUID，最後呼叫 `setDirty()`。因此死亡居民仍保留歷史身份，但不再占用住宅容量，也不會繼續導航或執行 warehouse 物流。
+
+新增 `ResidentRecord.withDeath(long)` 與 `CivilizationWorldData.addBuildingObservation(...)` 測試登記入口；新增 JUnit 回歸測試確認死亡居民保留雙 UUID 與 lifecycle 歷史，而住宅 roster 數量由 2 降至 1。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：註冊 `ServerLivingEntityEvents.AFTER_DEATH`。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：新增 `markResidentDead` 與建築 observation 測試登記入口。
+- `src/main/java/com/civilizationmod/ResidentRecord.java`：新增 `withDeath` lifecycle 轉換。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增死亡容量釋放與歷史身份回歸測試。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加死亡 callback 與 chunk unload 邊界規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步死亡 callback 與住宅容量規則。
+- `Mods.md`：追加本次 bug 修正。
+
+### 查證與驗證
+
+- 版本：Minecraft `26.2`；Fabric Loader `0.19.3`；Fabric API `0.158.0+26.2`；Fabric entity-events `5.0.5+06488ac19e`；Gradle `9.5.1`；Java toolchain `25`。
+- `ServerLivingEntityEvents` javap：確認公開 `AFTER_DEATH`。
+- `ServerLivingEntityEvents$AfterDeath` javap：確認 `afterDeath(LivingEntity, DamageSource)`。
+- `gradlew.bat --no-daemon compileJava compileClientJava --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain`：JUnit 通過，`FoodModelRegressionTest: PASS`。
+- `gradlew.bat --no-daemon build --console=plain`：`BUILD SUCCESSFUL`，check、jar、assemble 均通過。
+
+### 未完成與風險
+
+尚未在實際 Minecraft 世界中重新驗收死亡 callback。這次刻意沒有在每 20 tick 中把 lookup 不到的 Villager 直接判為死亡，因為 chunk unload 不等於死亡；死亡使用已查證的 server death callback。非死亡的 entity removal、卸載後永久遺失與 body rebind 仍需另外設計與查證。
+
+### 下一步
+
+啟動遊戲，在一間容量為 2 的住宅中綁定兩名村民；先執行 `/civitas building inspect <index>` 記錄居民數，殺死其中一名 Villager，等待一秒後重新執行 `building inspect` 與 `/civitas resident list`，確認住宅居民數下降、死亡居民 lifecycle 為 `dead`、residentId 仍存在。之後再測試死亡後重新指派新 Villager 是否能重新使用釋放的容量。
+
+### 來源
+
+- [1] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
+- [2] Fabric API entity-events-v1 0.158.0+26.2：`fabric-entity-events-v1-5.0.5+06488ac19e.jar`，JDK 25 `javap` 查證日期 2026-08-21。
+- [3] 使用者提供的 `latest.log`：server-side Villager death 記錄位於 21:16:07、21:16:16、21:16:18。

@@ -145,6 +145,21 @@ public record ResidentRecord(
                 Math.max(lastSeen, observedAt));
     }
 
+    public ResidentRecord withDeath(long observedAt) {
+        return new ResidentRecord(
+                residentId,
+                entityUuid,
+                colonyId,
+                "",
+                "",
+                "",
+                bodyType,
+                LIFECYCLE_DEAD,
+                name,
+                createdAt,
+                Math.max(lastSeen, observedAt));
+    }
+
     public ResidentRecord withLifecycle(String newLifecycle, long observedAt) {
         return new ResidentRecord(
                 residentId,

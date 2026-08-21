@@ -522,3 +522,13 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 禁止：不要使用未查證的 `level.getEntity(UUID)`；不要把 runtime indexes 當成第二真相；不要因 chunk unload 清除 entityUuid；不要把 colony truth 只塞進 Entity NBT。
 - 驗證：`compileJava compileClientJava`、`test`、`runFoodModelRegressionTest`、`build` 均成功；新增 JUnit 覆蓋 legacy migration idempotency、雙 UUID 分離、building key 與 Registry Codec round-trip。ItemFrame 真實 gameplay、SavedData 重開與 body rebind 尚未由 GameTest 覆蓋。
 - 查證日期：2026-08-21；方式：本機 JDK 25 `javap`、Minecraft 26.2 common jar、實際 Gradle 編譯／測試。
+
+
+## 2026-08-21 — 村民死亡釋放住宅容量
+
+- 根因：latest.log 已記錄 server-side Villager death，但原本 `BuildingResidentService` 只在每 20 tick 對活著且可 lookup 的 body 執行導航；找不到死亡 body 時直接 `continue`，沒有更新 ResidentRecord lifecycle，也沒有從 `BuildingObservation.residents` 移除 UUID，因此住宅容量持續被占用。
+- 已查證：Fabric API `fabric-entity-events-v1` `5.0.5+06488ac19e` 的 `net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents` 公開 `AFTER_DEATH`，nested callback `ServerLivingEntityEvents.AfterDeath.afterDeath(LivingEntity, DamageSource)`。
+- 採用：common-side `BuildingResidentService.register()` 註冊 `AFTER_DEATH`；只處理 server-side `Villager`。`CivilizationWorldData.markResidentDead(UUID, long)` 將 ResidentRecord lifecycle 設為 `dead`，保留 residentId、entityUuid、colonyId 與名稱，清除 home/work/role，並從所有 BuildingObservation roster 移除該 entity UUID，呼叫 `setDirty()`。
+- 禁止：不要在 tick 中因 `getEntityInAnyDimension` 暫時回傳 null 就宣告死亡；chunk unload 不等於死亡。死亡採 server death callback，未來若要處理非死亡 removal 必須另行查證 removal API。
+- 驗證：`compileJava compileClientJava`、`test`、`runFoodModelRegressionTest` 與 `build` 均成功；新增 JUnit 檢查死亡居民保留歷史身份且住宅 roster 數量下降。遊戲內死亡事件尚未重新手動驗收。
+- 查證日期：2026-08-21；方式：Fabric API jar `javap`、Minecraft 26.2 common 編譯與使用者提供 `latest.log`。

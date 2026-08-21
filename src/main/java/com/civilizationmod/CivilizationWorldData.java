@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Persistent world-level state for the civilization simulation.
@@ -152,11 +153,26 @@ public final class CivilizationWorldData extends SavedData {
         return List.copyOf(this.buildings);
     }
 
-    public int getBuildingCount() {
+        public int getBuildingCount() {
         return this.buildings.size();
     }
 
+    public boolean addBuildingObservation(BuildingObservation observation) {
+        if (observation == null || findBuilding(
+                observation.dimension(),
+                observation.markerX(),
+                observation.markerY(),
+                observation.markerZ()) != null) {
+            return false;
+        }
+        this.buildings.add(observation);
+        this.residentRegistry.migrateLegacy(List.of(observation));
+        this.setDirty();
+        return true;
+    }
+
         public BuildingObservation getBuilding(int oneBasedIndex) {
+
         if (oneBasedIndex < 1 || oneBasedIndex > this.buildings.size()) {
             return null;
         }
@@ -450,6 +466,33 @@ public final class CivilizationWorldData extends SavedData {
         }
         this.setDirty();
         return replacement;
+    }
+
+    public boolean markResidentDead(UUID entityUuid, long observedAt) {
+        if (entityUuid == null) {
+            return false;
+        }
+        ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
+        if (current == null || !current.isActive()) {
+            return false;
+        }
+
+        ResidentRecord dead = current.withDeath(observedAt);
+        if (!this.residentRegistry.upsert(dead)) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (int index = 0; index < this.buildings.size(); index++) {
+            BuildingObservation building = this.buildings.get(index);
+            if (!building.hasResident(entityUuid)) {
+                continue;
+            }
+            this.buildings.set(index, building.withoutResident(entityUuid));
+            changed = true;
+        }
+        this.setDirty();
+        return changed || !dead.equals(current);
     }
 
     public boolean clearResidentAssignment(java.util.UUID entityUuid, long observedAt) {

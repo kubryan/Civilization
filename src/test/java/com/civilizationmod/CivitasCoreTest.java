@@ -175,6 +175,45 @@ class CivitasCoreTest {
     }
 
     @Test
+    void residentDeathReleasesHomeCapacityButKeepsHistoricalIdentity() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                50,
+                70,
+                10,
+                BuildingObservation.STATUS_BOUND,
+                500L,
+                500L,
+                "minecraft:overworld",
+                0,
+                70,
+                0)
+                .withValidation(BuildingObservation.VALIDATION_VALID, BuildingObservation.VALIDATION_REASON_VALID)
+                .withResidenceMeasurements(2, 2)
+                .withColonyBinding(
+                        BuildingObservation.STATUS_BOUND,
+                        "minecraft:overworld@townhall-1",
+                        BuildingObservation.COLONY_REASON_BOUND)
+                .withAddedResident(RESIDENT_ONE, "Resident One")
+                .withAddedResident(RESIDENT_TWO, "Resident Two");
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addBuildingObservation(residence));
+        assertEquals(2, data.getBuilding(1).residentCount());
+        assertTrue(data.markResidentDead(RESIDENT_ONE, 600L));
+
+        ResidentRecord dead = data.getResidentRegistry().findByEntityUuid(RESIDENT_ONE);
+        assertNotNull(dead);
+        assertEquals(RESIDENT_ONE.toString(), dead.residentId());
+        assertEquals(RESIDENT_ONE.toString(), dead.entityUuid());
+        assertEquals(ResidentRecord.LIFECYCLE_DEAD, dead.lifecycle());
+        assertEquals("", dead.homeBuildingKey());
+        assertEquals(1, data.getBuilding(1).residentCount());
+        assertTrue(data.getBuilding(1).hasResident(RESIDENT_TWO));
+    }
+
+    @Test
     void buildingIdentityAndSettlementBindingRespectDimensionAndRange() {
         BuildingObservation observation = new BuildingObservation(
                 BuildingFunction.WAREHOUSE.id(),
