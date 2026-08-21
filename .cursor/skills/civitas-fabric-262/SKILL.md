@@ -580,3 +580,14 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 - 驗收：至少測試核心距離 `radiusA + radiusB + 1`（不相交）、`radiusA + radiusB`（貼邊衝突）、唯一核心邊界格（可綁定）；也要測試貼邊／相交時的建築 marker binding。
 - 禁止：不要把 overlaps 的 `<=` 擅自改成 `<`，不要把建築邊界判定改成圓形距離，也不要讓貼邊核心自動共用邊界建築。
 - 查證：`TownHallCore.java` 與 `CivitasCoreTest.java` 的 common-side 回歸；日期 2026-08-21。
+
+
+## 2026-08-22 — ResidentRecord gameplay 驗證必須使用 GameTest 分層
+
+- 任務：補足 ResidentRecord 只通過 JUnit／build 而沒有實際 gameplay 證據的落差。
+- 已確認：Fabric 官方 Automated Testing 26.2 將 Fabric Loader JUnit 定位為 component／Codec／helper 測試，Minecraft GameTest 才會啟動實際 server／client 來驗證 gameplay。官方 Loom 設定使用 `fabricApi.configureTests { createSourceSet = true; modId = ...; enableGameTests = true; enableClientGameTests = ...; eula = true }`，server 測試放在 `src/gametest/java`，descriptor 使用 `fabric-gametest` entrypoint；`build` 執行 server GameTest。
+- 已查證：本機 Fabric API 0.158.0+26.2 對應 `fabric-gametest-api-v1` 4.0.21+4a7fa0819e；其 `GameTest` annotation、`CustomTestMethodInvoker` 與 Minecraft 26.2 `GameTestHelper.getLevel()`、`spawnWithNoFreeWill(EntityType, BlockPos)`、`kill(Entity)`、`runAtTickTime(long, Runnable)`、`succeed()` 均可由 javap 確認。
+- 採用：ResidentRecord server GameTest 可驗證實際 Villager body UUID lookup、registry assignment、死亡 callback、dead lifecycle 與 active residential capacity 釋放；目前 `ResidentRecordGameTest` 已覆蓋這些項目。
+- 採用：`resident list` 玩家聊天、世界重開後 `.dat` reload、Villager unload／reload、`removed` lifecycle 與 body rebind 仍需另外人工或 GameTest；未實際驗證前 README／Mods.md 不得宣稱完成。
+- 禁止：不要用 JUnit Codec round-trip 或 `compileJava` 代替 gameplay proof；不要把 GameTest source set 的編譯成功當成 GameTest 實際通過；不要把暫時找不到 entity 當成 removed，因為 chunk unload 不等於死亡或移除。
+- 查證：Fabric 官方 Automated Testing 26.2（https://docs.fabricmc.net/develop/automatic-testing）、本機 Java 25 javap 與 `build` 的 FabricGameTestRunner 實際輸出；日期 2026-08-22。

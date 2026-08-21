@@ -77,6 +77,21 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 目前不會因為村民暫時離開載入範圍就刪除居民身份，也不會自動復活死亡的原版 Villager。死亡居民保留歷史資料，但不再占用住宅容量、執行導航或 warehouse 物流。
 
+### ResidentRecord 驗證分層
+
+ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 gameplay 閉環。現況分成以下層級：
+
+| 驗證項目 | 目前證據 | 狀態 |
+|---|---|---|
+| Codec、legacy migration、registry-only assignment、容量計算 | `CivitasCoreTest` JUnit | 已通過資料層測試 |
+| 實際 server world 內建立 Villager body、entity UUID lookup、assignment 與死亡 callback | Fabric 26.2 server GameTest | 已通過 server gameplay test |
+| `/civitas resident list` 玩家聊天輸出 | 命令已註冊，但尚未由玩家人工執行 | 待遊戲內驗收 |
+| `resident_registry` 真正寫入世界 `.dat` 並由另一個 server session reload | 目前未直接檢查 `.dat` 檔案或跨 session reload | 待驗收 |
+| Villager body 暫時 unload 後重新載入的 lookup | 目前只驗證 body 在實際 server world 已載入時可 lookup | 待 GameTest／人工驗收 |
+| Villager 被移除、`removed` lifecycle 與 body rebind | 目前只有 lifecycle 常數與資料轉換方法，尚未完成 server policy | 尚未實作 |
+
+因此，ResidentRecord 的正確說法是「資料層完成、server death／lookup GameTest 已通過，玩家命令與跨重開世界仍待驗收；removed／body rebind 政策尚未完成」，而不是宣稱所有居民 gameplay 已完成。
+
 ## 玩家可用命令
 
 主要命令根為 `/civitas`，`/civilization` 保留作為相容別名。命令樹與 Tab completion 共用相同邏輯；所有動態參數由 server 驗證。
@@ -110,19 +125,19 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | 1／2／4／6 容量住宅 marker | 已完成程式、容量檢查與多居民 roster |
 | Town Hall core、SavedData 與多核心非重疊軸對齊立方範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
 | `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；無 Town Hall 過渡模式已加入，完整範圍內外遊戲驗收仍待確認 |
-| ResidentRecord／ResidentRegistry | 已完成第一版；已收斂為 assignment 唯一寫入來源並通過 SavedData／Codec 回歸測試 |
-| 村民死亡後釋放住宅容量 | 已完成 server death callback 與回歸測試；等待本次遊戲內重新驗收 |
+| ResidentRecord／ResidentRegistry | 資料層與 registry-only assignment 已完成；server GameTest 已驗證實際 Villager lookup、assignment 與死亡 callback；`resident list` 與重開世界仍待人工驗收 |
+| 村民死亡後釋放住宅容量 | 已完成 server death callback、JUnit 與 server GameTest；仍待玩家在一般遊戲世界人工驗收 |
 | 農田與工作站 | 尚未實作 |
 | 食物實體物流與配送政策 | 尚未實作 |
 | 自訂 NPC Entity | 尚未實作，原版 Villager 暫作 body |
-| 完整 lifecycle、body rebind 與居民復活政策 | 尚未完成 |
+| 完整 lifecycle、removed／body rebind 與居民復活政策 | 尚未完成；目前只支援 `active` 與 `dead` 的 server death path |
 | 外部模組村莊 adapter | 架構方向已保留，尚未接入新的外部模組 |
 
 ## 下一步路線
 
-目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放、玩家命令樹整理，以及無 Town Hall 的舊世界過渡運作。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先遊戲內驗收是：在沒有 Town Hall 的維度確認有效 warehouse／住宅仍可 assign、導航與物流，接著建立 Town Hall，確認軸對齊立方範圍內建築取得 `colony_id`，範圍外建築立即停止 colony 功能，並確認 `/civitas townhall` 的回饋明確寫出「不是圓形」。
+目前最近完成的是 ResidentRecord／ResidentRegistry canonical assignment、server GameTest 的實際 Villager lookup／死亡容量驗證、玩家命令樹整理，以及無 Town Hall 的舊世界過渡運作。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先驗收是：在一般遊戲世界執行 `/civitas resident list`，退出並重新進入同一世界確認 `resident_registry` 持久化，再測試 Villager unload／重新載入；`removed` lifecycle 與 body rebind 會在另一次設計切片處理。
 
-通過死亡容量的遊戲內驗收後，將繼續完善居民 lifecycle、移除與 body rebind 規則，再處理住宅居民的床位分配與工作建築關係。自訂 NPC Entity 暫不列入下一個切片，因為目前應先穩定 server SavedData、原版 Villager body、住宅容量與物流閉環。
+通過 `resident list`、世界重開、Villager unload／reload 與死亡容量的遊戲內驗收後，將繼續完善 `removed` lifecycle、移除原因與 body rebind 規則，再處理住宅居民的床位分配與工作建築關係。自訂 NPC Entity 暫不列入下一個切片，因為目前應先穩定 server SavedData、原版 Villager body、住宅容量與物流閉環。
 
 長期路線包括農田與工作站、農田到 warehouse 的來源／目的地物流、食物消耗與配送、居民工作狀態、外部村莊 adapter、資料驅動建築與更完整的殖民地治理。每個功能會先拆成可編譯、可保存、可測試與可在遊戲內驗收的垂直切片。
 

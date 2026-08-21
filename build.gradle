@@ -26,6 +26,14 @@ fabricApi {
 	configureDataGeneration {
 		client = true
 	}
+
+	configureTests {
+		createSourceSet = true
+		modId = "civilizationmod-gametest"
+		enableGameTests = true
+		enableClientGameTests = false
+		eula = true
+	}
 }
 
 dependencies {

@@ -4400,3 +4400,79 @@ gradlew.bat --no-daemon build --console=plain
 ### 下一步
 
 啟動 client 後以預設半徑 64 建立核心，沿同一軸分別在 129 格與 128 格放置第二個 Town Hall marker，執行 `building scan` 比較不相交與貼邊結果；再在核心各軸正方向第 64 格放置有效建築 marker，確認邊界格屬於唯一核心。
+
+
+## 2026-08-22 — ResidentRecord server GameTest 與完成度聲明收斂
+
+### 背景與結論
+
+本次針對「ResidentRecord 已編譯／JUnit 通過，但尚未證明完整 gameplay 閉環」的風險進行修正。確認目前 JUnit 只直接建立 `CivilizationWorldData`、`ResidentRegistry` 與 `ResidentRecord`，沒有啟動真實 Minecraft server，也沒有執行 `/civitas resident list`、世界重開、`.dat` 直接檢查或 Villager unload／reload。
+
+因此新增獨立的 Fabric 26.2 server GameTest source set，並把 README 的完成度改成分層聲明：資料層與 server death／lookup gameplay test 已完成；玩家命令輸出、跨 session SavedData reload、Villager unload／reload、`.dat` 實檔確認仍待驗收；`removed` lifecycle、移除原因與 body rebind policy 尚未實作。
+
+### 實作
+
+`build.gradle` 依 Fabric 官方 26.2 Automated Testing 文件啟用：
+
+```gradle
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "civilizationmod-gametest"
+        enableGameTests = true
+        enableClientGameTests = false
+        eula = true
+    }
+}
+```
+
+新增 `src/gametest/resources/fabric.mod.json`，以 `fabric-gametest` entrypoint 註冊 `ResidentRecordGameTest`；新增 `src/gametest/java/com/civilizationmod/ResidentRecordGameTest.java`。測試在實際 FabricGameTestRunner server 中建立有效住宅 fixture、生成原版 Villager、以真實 entity UUID 建立 ResidentRecord assignment，驗證 loaded body lookup、active capacity 與 assigned building lookup，接著實際殺死 Villager，等待 server death callback，驗證 ResidentRecord 保留歷史身份並轉為 `dead`、active capacity 變為 0、死亡 body 不再解析為 active building assignment。
+
+GameTest 使用本機 26.2 已查證的 `EntityTypes.VILLAGER`、`GameTestHelper.getLevel()`、`spawnWithNoFreeWill(...)`、`kill(...)`、`runAtTickTime(...)` 與 `succeed()`；沒有使用猜測的 EntityType 常數或 client-only API。
+
+### 影響檔案
+
+- `build.gradle`：啟用 server GameTest source set，停用未需要的 client GameTest。
+- `src/gametest/resources/fabric.mod.json`：新增獨立 `civilizationmod-gametest` descriptor。
+- `src/gametest/java/com/civilizationmod/ResidentRecordGameTest.java`：實際 Minecraft server ResidentRecord gameplay test。
+- `README.md`：新增 ResidentRecord 驗證分層表，移除「資料層完成等於 gameplay 完成」的含糊說法。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 GameTest API 查證與 ResidentRecord coverage 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步 GameTest 規則。
+- `Mods.md`：本次正式進度與未完成缺口。
+
+### 查證與驗證
+
+版本環境：Minecraft 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric GameTest API 4.0.21+4a7fa0819e、Java 25、Gradle 9.5.1。
+
+Fabric 官方 Automated Testing 文件確認 JUnit 與 Minecraft GameTest 的用途不同：JUnit 用於 component／Codec／helper，GameTest 啟動實際 Minecraft server／client 驗證 gameplay。[1]
+
+本機 javap 確認 `GameTest` annotation、`CustomTestMethodInvoker`、`GameTestHelper` 與 Minecraft 26.2 `EntityTypes.VILLAGER` 的實際簽名。建置命令：
+
+```text
+gradlew.bat --no-daemon compileGametestJava --console=plain
+gradlew.bat --no-daemon build --console=plain
+```
+
+結果：
+
+```text
+BUILD SUCCESSFUL
+FoodModelRegressionTest: PASS
+All 2 required tests passed :)
+```
+
+`build` 實際執行 `runGameTest`，FabricGameTestRunner 啟動 Minecraft 26.2 server，ResidentRecord test 殺死 Villager 後 log 出現 `Resident body died ... assignment released`，兩個 required GameTests 全部通過；接著 JUnit、check、jar、sourcesJar、assemble 也全部通過。
+
+### 尚未完成與風險
+
+`/civitas resident list` 已存在且使用 canonical ResidentRegistry，但尚未由玩家在一般遊戲世界人工執行確認聊天輸出與重開後顯示。GameTest 目前證明 SavedData object 在真實 server 中可保存 assignment 並被 death callback 使用，但尚未從獨立第二次 server session 直接讀取世界 `.dat` 檔案確認 `resident_registry` reload。Villager body 在已載入 server world 的 UUID lookup 已通過，但 chunk unload／再載入後的 rebind 尚未通過 GameTest 或人工驗收。
+
+`ResidentRecord.LIFECYCLE_REMOVED` 目前只是資料模型常數，沒有 server-authoritative 的移除事件政策；不能把暫時找不到 entity 當成 removed，避免誤判 chunk unload。body rebind 與死亡後復活政策仍未實作。
+
+### 下一步
+
+在一般遊戲世界人工執行 `/civitas resident list`，記下 residentId、body UUID 與 assignment；退出世界再重新進入確認資料仍存在；再讓 Villager 離開與重新載入 chunk，確認 UUID lookup、導航與容量沒有被誤清除。完成上述人工驗收後，再設計 `removed` lifecycle、移除原因與 body rebind。
+
+### 來源
+
+[1] [Fabric Automated Testing 26.2](https://docs.fabricmc.net/develop/automatic-testing)
