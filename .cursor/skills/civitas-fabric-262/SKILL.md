@@ -359,3 +359,13 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：`BuildingResidentService` 對保存 roster 的村民重新套用角色外套；invalid 建築只停止導航／物流，不阻止外觀與背包管理。新增 `/civitas unassign <building_index> [villager]`，相容 `/civilization`，沿用 suggestions 與 `EntityArgument.entity()`。
 - 禁止：不要因 SavedData NBT 已含 `resident_uuid`／`residents` 就先重寫 roster Codec；重開後失效優先查 role reapply、validation gate 與 `findBuildingAssignedTo`。不要用未查證的 ItemFrame 專用事件或猜測 inventory 欄位。
 - 查證：本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 javap；Fabric Events：https://docs.fabricmc.net/develop/events；Fabric Custom Item Interactions：https://docs.fabricmc.net/develop/items/custom-item-interactions；日期 2026-08-21。
+
+
+## 2026-08-21 — 26.2 item definition 是 item icon 資源鏈必要節點
+
+- 任務：診斷住宅綁定裝置在 GUI 內顯示紫／青 missing-texture 佔位圖。
+- 已確認：專案正常 marker 的 `assets/civilizationmod/items/<id>.json` 使用 `{"model":{"type":"minecraft:model","model":"civilizationmod:item/<id>"}}`；這個 item definition 與 `models/item/<id>.json`、`textures/item/<id>.png` 共同構成 26.2 item icon 資源鏈。
+- 根因：`residence_binding_device` 原本只有 `models/item/residence_binding_device.json` 與 PNG，缺少 `items/residence_binding_device.json`；因此 PNG 存在且可進 texture atlas，物品 icon 仍可能顯示 missing-texture。
+- 採用：新增 item 時必須同時檢查 registry id、`items/<id>.json`、`models/item/<id>.json` 與 `textures/item/<id>.png`，並在 `processResources`／`build` 後確認四者進入 `build/resources/main`。
+- 禁止：不要只以 PNG 存在、`models/item` 存在或 texture atlas 載入成功宣稱 item icon 資源完整。
+- 查證：專案既有 `warehouse_marker.json`、`residential_marker_1.json`、`processResources` 成功輸出與 `build/resources/main` 檔案檢查；日期 2026-08-21。

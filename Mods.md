@@ -3288,3 +3288,47 @@ building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已
 - [1] https://docs.fabricmc.net/develop/events — Fabric Events 26.2。
 - [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions。
 - [3] 本機 Minecraft 26.2 common jar：`C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`，`javap` 查證日期 2026-08-21。
+
+
+## 2026-08-21 — 修正住宅綁定裝置 missing-texture 破圖
+
+### 變更
+
+根據玩家提供的遊戲截圖，住宅綁定裝置的 tooltip 能正常顯示，但物品欄圖示出現紫／青棋盤狀 missing-texture 佔位圖。檢查原始 PNG 後確認貼圖檔本身存在、尺寸為 16×16 RGBA，`models/item/residence_binding_device.json` 也存在且 layer0 指向正確；真正缺失的是 Minecraft 26.2 新 item model 資源鏈所需的 `assets/civilizationmod/items/residence_binding_device.json`。
+
+補上 item definition，讓 `civilizationmod:residence_binding_device` 透過 `minecraft:model` 導向既有的 `civilizationmod:item/residence_binding_device` model，再由 model 的 layer0 載入既有 PNG。這與專案中已正常工作的 `warehouse_marker` 與 `residential_marker_1` item definition 格式一致，沒有改動住宅綁定裝置的 Java 行為、tooltip 內容、模型或 PNG。
+
+### 影響檔案
+
+- `src/main/resources/assets/civilizationmod/items/residence_binding_device.json`：新增 Minecraft 26.2 item definition，修正物品圖示資源鏈。
+- `src/main/resources/assets/civilizationmod/models/item/residence_binding_device.json`：確認既有 `minecraft:item/generated` 與 layer0 不需修改。
+- `src/main/resources/assets/civilizationmod/textures/item/residence_binding_device.png`：確認既有 16×16 RGBA 貼圖不需修改。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 26.2 item definition 必要節點與檢查規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步追加同一項可重用查證規則。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域 skill 規則。
+- `Mods.md`：追加本次破圖根因、修正與驗證紀錄。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- 截圖檢查：原始截圖為 496×124；確認 tooltip 與 item ID 可見，圖示區出現紫／青 missing-texture 佔位圖。
+- 資產檢查：確認 PNG 為 16×16，且 model、texture 路徑存在；對照正常 marker 的 `assets/civilizationmod/items/<id>.json` 格式。
+- 命令：`gradlew.bat --no-daemon processResources --console=plain`；結果：`BUILD SUCCESSFUL`。
+- 命令：`gradlew.bat --no-daemon compileJava compileClientJava build --console=plain`；結果：`BUILD SUCCESSFUL`。
+- 命令：`gradlew.bat --no-daemon runFoodModelRegressionTest --console=plain`；結果：`FoodModelRegressionTest: PASS`。
+- 命令：`gradlew.bat --no-daemon runClient --console=plain`；結果：完成 Fabric loader、Render thread、texture atlas 與 client initialization；Realms 授權訊息仍是開發環境服務訊息，未見本次資源修正造成的 fatal error。測試完成後已停止持續執行的 client。
+- jar 檢查：`build/libs/civilizationmod-1.0.0.jar` 同時包含 `assets/civilizationmod/items/residence_binding_device.json`、`models/item/residence_binding_device.json` 與 `textures/item/residence_binding_device.png`。
+- 最新 client log 以 `findstr` 檢查未找到 `residence_binding_device`、`Unable to load model`、`Missing texture` 或 `Failed to load model` 警告。
+
+### 未完成與風險
+
+檔案層級、jar 封裝與 client 啟動驗證均已通過，但本次無法替玩家直接操作 GUI 重新截圖，因此仍需要玩家在遊戲中重新載入資源或重啟 client，確認住宅綁定裝置圖示已恢復正常。若仍看到舊紫／青圖示，請先按 `F3 + T` 重新載入資源；若仍未修正，再提供新的 `latest.log` 與截圖。
+
+### 下一步
+
+進入遊戲後重新取得或查看 `civilizationmod:residence_binding_device`，確認物品欄、快捷欄與 tooltip 左側圖示不再破圖。確認後即可繼續住宅綁定裝置的遊戲內流程驗收；本次修正尚未新增正式合成配方。
+
+### 來源
+
+- [1] 專案既有正常資源：`assets/civilizationmod/items/warehouse_marker.json` 與 `assets/civilizationmod/items/residential_marker_1.json`。
+- [2] Minecraft 26.2 實際 `build/resources/main` 與 `build/libs/civilizationmod-1.0.0.jar` 資源封裝檢查，日期 2026-08-21。

@@ -459,3 +459,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 新增 `/civitas unassign <building_index> [villager]` 與 `/civilization` 相容別名時，沿用既有 building index suggestions、`EntityArgument.entity()`、server 維度／Villager 類型驗證與 `BuildingObservation.withoutResident(UUID)`；解除後只有在村民沒有其他 Civitas building assignment 時才清除帶 `civitas_role` 的角色胸甲。
 
 查證來源：本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `javap`（2026-08-21）；Fabric 26.2 Events 文件：https://docs.fabricmc.net/develop/events；Fabric 26.2 Items 文件：https://docs.fabricmc.net/develop/items/custom-item-interactions。
+
+
+## 已查證：Minecraft 26.2 item definition 資源鏈（2026-08-21）
+
+本專案實際 `build/resources/main` 檢查確認，26.2 item registry 要正常解析物品圖示，除了 `assets/<modid>/models/item/<id>.json` 與其 texture 外，還必須有 `assets/<modid>/items/<id>.json`。後者使用：`{"model":{"type":"minecraft:model","model":"<modid>:item/<id>"}}` 導向 item model。`warehouse_marker` 與 `residential_marker_1` 的既有工作資源鏈均採此格式；住宅綁定裝置原先缺少 `items/residence_binding_device.json`，因此遊戲中 item icon 出現紫／青 missing-texture 佔位圖，雖然 PNG 與 legacy model 本身存在。
+
+採用規則：每次新增 item 都要同時檢查 registry id、`items/<id>.json`、`models/item/<id>.json` 與 `textures/item/<id>.png`，並在 `processResources` 或 `build` 後確認四者均進入 `build/resources/main`。不要只以 PNG 存在或 texture atlas 載入成功判斷 item model 完整。
+
+查證：專案既有正常 marker 的 26.2 item definition、`gradlew.bat --no-daemon processResources --console=plain` 與 `build/resources/main` 檔案檢查；日期 2026-08-21。
