@@ -4133,3 +4133,33 @@ test { useJUnitPlatform() }
 - [1] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
 - [2] Fabric API entity-events-v1 0.158.0+26.2：`fabric-entity-events-v1-5.0.5+06488ac19e.jar`，JDK 25 `javap` 查證日期 2026-08-21。
 - [3] 使用者提供的 `latest.log`：server-side Villager death 記錄位於 21:16:07、21:16:16、21:16:18。
+
+
+## 2026-08-21 — README.md 同步目前 Civitas 殖民地建設狀態
+
+### 變更
+
+重新整理 README.md，使公開專案說明與目前實際程式狀態一致。README 現在以殖民地建設為主線，說明 Town Hall 殖民地核心、可設定且不可重疊的多核心範圍、住宅與 warehouse 的 `colony_id` 歸屬、ItemFrame marker 與 territory、warehouse storage snapshot、安全 allowlist 物流、27 格 Civitas Villager backpack、居民 `ResidentRecord`／`ResidentRegistry`、村民死亡後釋放住宅容量，以及目前仍未完成的農田、工作站、自訂 NPC 與完整 lifecycle。
+
+同步修正舊版 README 中把 Town Hall 寫成「尚未實作」、把住宅描述成「仍沿用單一 resident」以及沒有居民永久身份與死亡容量資訊的過時內容。README 也補充目前命令表、Tab completion 政策、Java 25 建置命令、`runDatagen` 與 `build` 分開執行的 Gradle 注意事項、遊戲內死亡容量驗收流程、Git 上傳範圍與官方參考連結。
+
+### 影響檔案
+
+- `README.md`：完整同步目前公開專案說明與驗收指引。
+- `Mods.md`：追加本次 README 狀態同步紀錄。
+
+### 文件內容重點
+
+README 保留 AI 輔助生成免責聲明，並以表格整理目前系統狀態。已明確標示：Town Hall 與 `colony_id` 程式切片已完成但多核心完整人工驗收仍待確認；ResidentRecord／ResidentRegistry 與死亡容量修正已完成自動化驗證但需要遊戲內重新驗收；外部村莊 adapter、自訂 NPC Entity、農田與工作站仍未完成。
+
+README 的 References 使用 Fabric 官方 Saved Data 與 Events 文件，不把尚未遊戲內驗收的項目宣稱為完整 gameplay 成功。[1] [2]
+
+### 驗證與下一步
+
+本次修改為 Markdown 文件，不改變 runtime 程式碼。提交前執行 README 內容檢查、`git diff --check` 與既有 `gradlew.bat --no-daemon build --console=plain`；若 build 成功，提交並推送到 `origin/main`。下一步仍是遊戲內驗收死亡居民釋放住宅容量，以及 Town Hall 多核心範圍內外的 colony binding。
+
+### 來源
+
+- [1] Fabric Saved Data：https://docs.fabricmc.net/develop/saved-data
+- [2] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
+- [3] 專案目前程式碼、測試結果與 `Mods.md` 歷史，日期 2026-08-21。
