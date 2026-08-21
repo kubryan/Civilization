@@ -6,6 +6,7 @@
   "item.civilizationmod.residential_marker_4": "住宅標識（4 床）",
     "item.civilizationmod.residential_marker_6": "住宅標識（6 床）",
   "item.civilizationmod.residence_binding_device": "住宅綁定裝置",
+  "item.civilizationmod.town_hall_marker": "市政廳標誌",
 
   "civilizationmod.command.status": "狀態：版本=%1$d，步數=%2$d，聚落=%3$d，人口=%4$d，食物=%5$d，債務=%6$d，穩定度=%7$d，事件=%8$s",
   "civilizationmod.command.simulate": "第 %1$d 步：人口=%2$d，需求=%3$d，消耗=%4$d，短缺=%5$d，食物=%6$d，債務=%7$d，穩定度=%8$d，事件=%9$s",

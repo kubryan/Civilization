@@ -3375,3 +3375,53 @@ building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已
 
 - [1] 本機 Minecraft 26.2 common jar 的 `net.minecraft.world.item.Items` javap 查證，日期 2026-08-21。
 - [2] Fabric 26.2 配方生成文件：https://docs.fabricmc.net/develop/data-generation/recipes。
+
+
+## 2026-08-21 — 建立市政廳 marker 視覺 prototype
+
+### 變更
+
+依照殖民地建設主線，新增 `town_hall_marker` 的第一版視覺 prototype。由於目前 marker 是放入 ItemFrame 的物品，本次所稱的「方塊模型」實際採 Minecraft item model，而不是可放置的獨立方塊 block model；資源鏈為 `items/town_hall_marker.json` → `models/item/town_hall_marker.json` → `textures/item/town_hall_marker.png`。
+
+視覺方向定義為殖民地行政核心：對稱石磚市政建築、深藍圓頂、金色頂飾與中央金色市政徽記、兩側深紅旗幟。深藍／金色／石灰／深紅色組與 warehouse 的箱子輪廓、residential marker 的床與容量數字保持差異，玩家在 ItemFrame 或背包內能以輪廓與顏色快速辨識。
+
+新增 `TownHallMarkerItem` 與 `CivilizationItems.TOWN_HALL_MARKER`，物品單件堆疊，並加入英文與兩份繁體中文 locale 名稱。這一輪刻意只完成可顯示的資產 prototype；沒有把 `town_hall_marker` 加入 `BuildingMarkerRegistry`，也沒有加入 `BuildingFunction.TOWN_HALL`，因此不會提前觸發 warehouse／residence 的 territory selection、building scan、validation 或村民物流。這是為了先把市政廳的 server 規則定義清楚，再開啟真正的殖民地核心功能。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/TownHallMarkerItem.java`：市政廳 marker 的純視覺 item wrapper。
+- `src/main/java/com/civilizationmod/CivilizationItems.java`：註冊 `TOWN_HALL_MARKER_KEY` 與 item。
+- `src/main/resources/assets/civilizationmod/items/town_hall_marker.json`：Minecraft 26.2 item definition。
+- `src/main/resources/assets/civilizationmod/models/item/town_hall_marker.json`：`minecraft:item/generated` item model，layer0 指向市政廳材質。
+- `src/main/resources/assets/civilizationmod/textures/item/town_hall_marker.png`：16×16 RGBA 市政廳 marker 貼圖；透明外框、石磚建築、藍色圓頂、金色徽記、紅色旗幟。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增 `Town Hall Marker`。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`、`zh_cn.json`：新增 `市政廳標誌`。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md`、全域 skill：同步市政廳資產與 server 功能分層規則。
+- `Mods.md`：追加本次設計、驗證與下一步。
+
+### 資產設計與查證
+
+AI 概念圖先以對稱市政建築作為視覺基準，再經透明背景處理與最近鄰縮放產生 16×16 RGBA 貼圖。生成工具輸出的棋盤格背景實際是全不透明像素，因此沒有直接把概念圖當正式材質；一次性處理只移除邊緣連通的亮色棋盤格，保留建築深色像素外框。正式貼圖四角 alpha 均為 0，alpha bbox 為 `(2,1,13,15)`。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- 現有程式查證：`BuildingFunction` 目前只有 `WAREHOUSE`、`RESIDENCE`；`BuildingMarkerRegistry.registerDefaults()` 目前只有 warehouse 與四種 residence marker，因此本次不提前註冊 Town Hall function。
+- 命令：`gradlew.bat --no-daemon compileJava compileClientJava build --console=plain`；結果：`BUILD SUCCESSFUL`。
+- 命令：`gradlew.bat --no-daemon runFoodModelRegressionTest --console=plain`；結果：`FoodModelRegressionTest: PASS`。
+- 命令：`gradlew.bat --no-daemon runClient --console=plain`；結果：完成 Fabric loader、Render thread、texture atlas 與 client initialization，未見市政廳資產導致的 fatal error；測試完成後已停止 client。
+- jar 檢查：正式 `civilizationmod-1.0.0.jar` 包含 `items/town_hall_marker.json`、`models/item/town_hall_marker.json` 與 `textures/item/town_hall_marker.png`；最新 client log 未找到 `Unable to load model`、`Missing texture` 或 `Failed to load model`。
+- `git diff --check`：待提交前執行；本次只保留正式專案資產，未把一次性概念圖與處理腳本加入 repository。
+
+### 未完成與風險
+
+目前市政廳 marker 只是可用 `/give @p civilizationmod:town_hall_marker` 取得的視覺 prototype，尚無正式配方、creative tab、ItemFrame 掃描、領地驗證、殖民地保存資料、居民上限或建築解鎖效果。這不是 bug，而是刻意將視覺資產與尚未決定的 server 規則分開。
+
+### 下一步
+
+下一個最小可玩功能應先設計並實作 **Town Hall server registration**：玩家將市政廳 marker 放入 ItemFrame 後，系統驗證唯一性、位置與領地，建立一筆殖民地核心 SavedData。第一版建議先只允許每個維度一座市政廳，保存核心座標、建立時間、範圍半徑與殖民地 ID；確認核心存在後，再把住宅與倉庫建築綁定到該殖民地，最後才加入居民上限與建築解鎖規則。市政廳 marker 的正式配方應在這套 server 規則確定後再設計，避免先固定成本卻要因玩法平衡重做。
+
+### 來源
+
+- [1] 專案現有 `BuildingFunction.java`、`BuildingMarkerRegistry.java` 與 `CivitasBuildingMarkerItem.java`。
+- [2] `imagegen` skill 的 game asset、transparent asset 與 lightweight validation 規則。

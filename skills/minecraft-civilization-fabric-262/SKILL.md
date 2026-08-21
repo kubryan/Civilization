@@ -475,3 +475,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 本次使用實際 Minecraft 26.2 common jar 的 `javap` 確認 `net.minecraft.world.item.Items` 公開 `public static final Item STICK`。住宅綁定裝置配方採用既有 `FabricRecipeProvider`／`RecipeProvider.shaped(...)` 流程：pattern `sss`、`sis`、`sss`，`s = Items.STICK`、`i = Items.IRON_INGOT`，以 `has(Items.STICK)` 作為解鎖條件，輸出 `CivilizationItems.RESIDENCE_BINDING_DEVICE`。配方是 3×3 有序合成，不是 shapeless。
 
 查證：`C:\Program Files\Java\jdk-25.0.2\bin\javap.exe` 對 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `net.minecraft.world.item.Items` 輸出；日期 2026-08-21。
+
+
+## 已確認：市政廳 marker 視覺 prototype 與功能分層（2026-08-21）
+
+市政廳第一步只建立可顯示的 `town_hall_marker` item、16×16 RGBA 貼圖、`models/item/town_hall_marker.json` 與 26.2 `items/town_hall_marker.json`。視覺主題採石磚對稱市政建築、深藍圓頂、金色市政徽記與深紅旗幟，刻意避開 warehouse 箱子輪廓與 residential marker 床／容量數字。
+
+在 `BuildingFunction` 尚未加入 `TOWN_HALL`、`BuildingMarkerRegistry` 尚未定義 Town Hall metadata、殖民地範圍／居民上限／建築解鎖規則尚未決定前，市政廳 item 應保持純視覺 prototype，不要把它註冊成可掃描 building marker 或讓共用 territory selection callback 誤把它當成 warehouse／residence。完成資產後的下一個最小功能切片才是 server-authoritative Town Hall registration、單一殖民地核心與基礎範圍規則。
+
+查證：現有 `BuildingFunction` 只有 WAREHOUSE／RESIDENCE，`BuildingMarkerRegistry.registerDefaults()` 只有 warehouse 與 residence；本次 `compileJava`、`compileClientJava`、`build` 與 `runClient` smoke test 通過；日期 2026-08-21。

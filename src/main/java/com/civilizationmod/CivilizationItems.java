@@ -46,6 +46,13 @@ public final class CivilizationItems {
             new Item.Properties().stacksTo(1)
     );
 
+    public static final ResourceKey<Item> TOWN_HALL_MARKER_KEY = itemKey("town_hall_marker");
+    public static final Item TOWN_HALL_MARKER = register(
+            TOWN_HALL_MARKER_KEY,
+            TownHallMarkerItem::new,
+            new Item.Properties().stacksTo(1)
+    );
+
     public static final ResourceKey<Item> RESIDENCE_BINDING_DEVICE_KEY = itemKey("residence_binding_device");
     public static final Item RESIDENCE_BINDING_DEVICE = register(
             RESIDENCE_BINDING_DEVICE_KEY,

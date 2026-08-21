@@ -378,3 +378,13 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：配方 pattern 為 `sss`、`sis`、`sss`，`s = Items.STICK`、`i = Items.IRON_INGOT`，輸出 `CivilizationItems.RESIDENCE_BINDING_DEVICE`，解鎖條件為 `has(Items.STICK)`。
 - 禁止：不要將本配方改成 shapeless；不要把木棍寫成猜測的字串或自行建立新材料物品。
 - 查證：本機 Minecraft 26.2 common jar 的 `javap`、既有 recipe provider；日期 2026-08-21。
+
+
+## 2026-08-21 — 市政廳 marker 視覺 prototype 與功能分層
+
+- 任務：建立市政廳 marker 的方塊式 item model 與獨立材質。
+- 已確認：ItemFrame marker 目前使用 item model 資源鏈：`items/<id>.json` → `models/item/<id>.json` → `textures/item/<id>.png`；既有 `BuildingFunction` 只有 warehouse／residence。
+- 採用：`town_hall_marker` 先註冊為純視覺、單件堆疊 item，材質使用石磚市政建築、深藍圓頂、金色徽記、深紅旗幟；與 warehouse 箱子及 residential 床位數字保持清楚差異。
+- 採用：在 `TOWN_HALL` 功能、殖民地核心 SavedData、範圍、居民上限與建築解鎖規則決定前，不把 Town Hall 加入 `BuildingMarkerRegistry`，避免共用 territory selection 或 building scan 提前把 prototype 當成可運作建築。
+- 禁止：不要把市政廳 marker 當成已完成 Town Hall 功能宣稱；不要在尚未定義 server 規則前複製 warehouse／residence validation branch。
+- 查證：`BuildingFunction.java`、`BuildingMarkerRegistry.java`、`CivilizationItems.java` 與 26.2 build/runClient smoke test；日期 2026-08-21。
