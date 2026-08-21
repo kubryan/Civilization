@@ -102,9 +102,9 @@ ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 
 |---|---|
 | `/civitas help` | 顯示目前玩家可用命令與使用方式。 |
 | `/civitas status` | 查詢文明與 SavedData 摘要。 |
-| `/civitas building scan [radius]` | 掃描附近已載入的 Civitas ItemFrame 建築。 |
-| `/civitas building list` | 列出已登記建築與驗證／殖民地狀態。 |
-| `/civitas building inspect <index>` | 查看指定建築、居民與 storage snapshot。 |
+| `/civitas building scan [radius]` | 掃描附近已載入的 Civitas ItemFrame 建築；若有無效建築，會在聊天補充先查 list／inspect 的診斷提示。 |
+| `/civitas building list` | 列出已登記建築與驗證／殖民地狀態，包含本地化 validation reason。 |
+| `/civitas building inspect <index>` | 查看指定建築、居民、storage snapshot 與本地化 validation reason。 |
 | `/civitas assign <building_index> [villager]` | 將 Villager 指派至有效 colony-bound 建築；該維度尚無 Town Hall 時，使用過渡模式。 |
 | `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係；`building_index` 從 1 開始，請先使用 `/civitas building list`。 |
 | `/civitas unassign villager` | 解除玩家準星所注視的存活 Villager；查詢與清除以 ResidentRegistry 為準。 |
@@ -112,6 +112,8 @@ ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 
 | `/civitas resident list` | 查詢 ResidentRecord 清單。 |
 | `/civitas townhall` | 查詢已保存的 Town Hall cores。 |
 | `/civitas townhall radius <index> <radius>` | 調整 Town Hall 的軸對齊立方範圍；這不是圓形半徑，變更後會重新計算建築 colony binding。 |
+
+Warehouse marker 的 territory 是保存於 marker ItemStack 的**包含邊界立方體**；ItemFrame 的 `blockPosition` 必須落在 `minX..maxX`、`minY..maxY`、`minZ..maxZ` 內。玩家可以先放 ItemFrame 再圈 territory，但完成圈選時必須把 ItemFrame 所在方塊包含進去；若之後看到 `marker_outside_territory`，這代表規則正常拒絕了範圍外 marker，請重新圈選而不是重放或清空箱子內容。執行 `/civitas building scan` 若有 invalid marker，聊天會提示使用 `/civitas building list` 或 `/civitas building inspect <index>` 查看本地化原因。
 
 `building_index` 與 `resident_index` 都是從 1 開始的顯示編號，不是 Java 的 0-based list offset。輸入 0 時，模組會明確提示先查對應的 `building list` 或 `resident list`；動態 suggestions 也只提供從 1 開始的有效值。若 building index 對不上，應先執行 `/civitas building list`；若只想解除準星村民，可使用 `/civitas unassign villager`，若 body 暫時不在載入範圍，可使用 `/civitas unassign resident <resident_index>`。
 
@@ -181,7 +183,7 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 
 ## 測試與驗收
 
-純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、registry-only assignment／unassign、同一村民同一建築的 idempotent duplicate assignment、Codec round-trip，以及死亡居民釋放住宅容量。Fabric 26.2 server GameTest 另外驗證真實 Villager body、UUID lookup、assignment、同目標重複綁定不增加容量與死亡 callback。食物模型與舊聚落資料層仍供回歸測試使用，但其 `/simulate`、`/scan` 與 `/settlement` 公開命令已從命令樹移除。這些自動化測試仍不等於完整玩家 gameplay；ItemFrame、實際 `/civitas assign`／綁定裝置聊天輸出、SavedData 跨 session 重開、命令 help 畫面與 GUI 仍需要在遊戲內驗收。[1] [2]
+純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、WarehouseTerritory inclusive bounds、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、registry-only assignment／unassign、同一村民同一建築的 idempotent duplicate assignment、Codec round-trip，以及死亡居民釋放住宅容量。Fabric 26.2 server GameTest 另外驗證真實 Villager body、UUID lookup、assignment、同目標重複綁定不增加容量與死亡 callback。食物模型與舊聚落資料層仍供回歸測試使用，但其 `/simulate`、`/scan` 與 `/settlement` 公開命令已從命令樹移除。這些自動化測試仍不等於完整玩家 gameplay；ItemFrame、實際 `/civitas assign`／綁定裝置聊天輸出、SavedData 跨 session 重開、命令 help 畫面與 GUI 仍需要在遊戲內驗收。[1] [2]
 
 死亡容量的最小遊戲內驗收流程如下：
 
@@ -206,6 +208,8 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 預期住宅居民數量下降一名，死亡居民仍出現在列表中且 lifecycle 為 `dead`。之後重新指派一名 Villager，確認釋放的容量可以再次使用。對已綁定的同一名 Villager 再執行一次 `/civitas assign` 或使用綁定裝置重複右鍵時，預期顯示「已是此住宅居民」類提示，而不是再次顯示成功綁定；居民數應維持不變。
 
 解除指派的人工驗收應涵蓋 `/civitas unassign 0` 的明確 1-based 提示、`/civitas unassign <building_index>` 的準星村民流程、`/civitas unassign villager` 的直接準星流程，以及 `/civitas unassign resident <resident_index>` 的 registry-only 流程。最後一種即使 Villager body 暫時不在載入範圍，也應能清除 canonical ResidentRecord assignment。
+
+Warehouse territory 的人工診斷流程是：先用 marker 完成兩點圈選，再把 marker 放入 ItemFrame，執行 `/civitas building scan`；若 invalid hint 指向 `marker_outside_territory`，執行 `/civitas building list` 或 `/civitas building inspect <index>` 查看完整本地化 reason，確認 ItemFrame 所在方塊已包含於保存的領地六面邊界內。重新圈選後再 scan，預期 validation 變為 valid，且不需要搬動或清空領地內箱子物品。
 
 ## 專案規則與研究文件
 

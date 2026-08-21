@@ -713,3 +713,12 @@ Town Hall colony gate 採用「無核心時過渡、建立核心後嚴格」政�
 保留 `/civitas unassign <building_index> [villager]`，並支援 `/civitas unassign villager` 依玩家準星選取存活 Villager，以及 `/civitas unassign resident <resident_index>` 依 resident list 編號解除指派。`CivilizationWorldData.clearResidentAssignmentByResidentId(...)` 直接使用 `ResidentRegistry.findByResidentId(...)` 找到 active record，清除 home／work／role／colony 並呼叫 `setDirty()`；不以 legacy `BuildingObservation` roster 判斷是否已指派，因此 body 暫時未載入或 roster 不同步時仍可依 canonical registry 解除指派。
 
 解除指派成功後，只有在已載入 server level 找到對應 body UUID 時才清除 Civitas role visual；找不到 body 不視為 removed，也不阻止 registry assignment 清除。不得把 Java 0-based list offset 暴露給玩家，也不得把 chunk unload 當作 removed lifecycle。
+
+
+## 已確認：Warehouse marker territory 診斷規則（2026-08-22）
+
+Warehouse marker 的 territory 是保存在 marker ItemStack 上的 normalized inclusive cuboid。`WarehouseTerritoryValidator.validate(...)` 使用 ItemFrame 的 `blockPosition()` 判定，三個軸都必須滿足 `min <= position <= max`；`marker_outside_territory` 表示 ItemFrame 所在方塊確實位於保存領地外，不能當成系統 bug 或自動放寬。
+
+`/civitas building list` 與 `building inspect` 必須將 validation reason 轉成本地化、可操作的玩家文字；`/civitas building scan` 在 invalid 數量大於零時額外提示玩家先查 list／inspect。`marker_outside_territory` 文案需說明重新圈選 warehouse territory，並確保 ItemFrame 所在方塊包含在領地六面 inclusive 邊界內；不要求搬動 ItemFrame、重放 marker 或清空領地箱子。
+
+`BuildingScanSummary` 暫時維持 aggregate counts，不新增 per-reason 持久化欄位；scan 使用通用 invalid hint，具體原因由 building list／inspect 顯示。三份 locale 必須同步，zh_cn 依專案政策使用繁體中文。

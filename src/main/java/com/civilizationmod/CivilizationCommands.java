@@ -453,18 +453,23 @@ public final class CivilizationCommands {
 					origin,
 				radius,
 				source.getServer().getTickCount());
-			source.sendSuccess(() -> CivilizationMessages.translatable(
-					"civilizationmod.command.building.scan.result",
-					radius,
-					summary.detected(),
-					summary.updated(),
-											summary.bound(),
-						summary.valid(),
-						summary.invalid(),
-						summary.townHallsRegistered(),
-						summary.townHallConflicts()), false);
-
-			return summary.updated();
+				source.sendSuccess(() -> CivilizationMessages.translatable(
+						"civilizationmod.command.building.scan.result",
+						radius,
+						summary.detected(),
+						summary.updated(),
+												summary.bound(),
+											summary.valid(),
+											summary.invalid(),
+											summary.townHallsRegistered(),
+											summary.townHallConflicts()), false);
+				if (summary.invalid() > 0) {
+					source.sendSuccess(() -> CivilizationMessages.translatable(
+							"civilizationmod.command.building.scan.invalid_hint",
+							summary.invalid()), false);
+				}
+	
+				return summary.updated();
 		}
 
 		private static int buildingList(CommandSourceStack source) {

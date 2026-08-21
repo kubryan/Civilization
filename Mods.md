@@ -4567,3 +4567,46 @@ All 2 required tests passed :)
 ### 下一步
 
 在遊戲內先執行 `/civitas building list` 與 `/civitas resident list`。接著測試 `/civitas unassign 0`，確認收到從 1 開始的提示；再用正確建築編號測試準星村民、`/civitas unassign villager` 與 `/civitas unassign resident <居民編號>`。確認 `/civitas building inspect`、`/civitas resident list` 的 assignment 已清除，退出重進後再次確認，並驗收跨 building index 不一致時不再因 legacy roster 而誤報「沒有被指派」。
+
+
+## 2026-08-22 — 改善 marker_outside_territory 的玩家可見診斷
+
+### 判定
+
+確認 `marker_outside_territory` 是既有規則正確運作，不是 territory validator bug。`WarehouseTerritoryValidator.validate(...)` 讀取 marker ItemStack 上保存的 normalized territory，使用 ItemFrame 的 `blockPosition()`；`WarehouseTerritory.contains(...)` 對三個軸都採 inclusive 邊界 `min <= position <= max`。因此玩家先放 ItemFrame 再圈選是允許的，但完成圈選時必須把 ItemFrame 所在方塊包含在保存範圍內。重新圈選後變成 valid，符合設計。
+
+### 變更
+
+`/civitas building scan` 在掃描結果 `invalid > 0` 時新增一行本地化 invalid hint，引導玩家執行 `/civitas building list` 或 `/civitas building inspect <index>` 查看具體 validation reason。沒有擴充 `BuildingScanSummary` 的 per-reason 持久化或統計欄位，避免為單一診斷引入不必要的資料 schema；scan 先提供通用入口，list／inspect 再顯示具體 reason。
+
+更新 `marker_outside_territory` 的三份 locale 文案。繁中現在會清楚說明「標識物品展示框位於已保存的 warehouse 領地外」，並提示重新圈選、確保 ItemFrame 所在方塊位於包含邊界內；英文同步說明 saved warehouse territory、ItemFrame block 與 inclusive bounds；zh_cn 依政策沿用繁體中文。既有 `buildingEntry(...)` 的 validation reason mapping 保持使用 canonical `BuildingObservation.VALIDATION_REASON_MARKER_OUTSIDE_TERRITORY`，沒有新增 ad-hoc reason。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：scan invalid 時補發本地化診斷 hint。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增 scan invalid hint，改善 marker outside territory reason。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：同步繁中 scan hint 與 territory reason。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：同步繁體中文內容。
+- `README.md`：記錄 inclusive territory、scan／list／inspect 診斷與不需搬動或清空物品的處理方式。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 territory diagnostics 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步專案 skill 副本。
+- `Mods.md`：追加本次正式進度記錄。
+
+### 版本與 API 邊界
+
+本次只使用既有 common/server command、validator、SavedData 與 locale 路徑，沒有新增未查證的 Fabric 26.2 API、Mixin、networking 或 client-only 類別；沒有修改 `WarehouseTerritory`、`BuildingScanSummary` 的資料格式，也沒有改變 marker outside 的判定語義。
+
+### 查證與驗證
+
+| 命令 | 結果 |
+|---|---|
+| `C:\\Minecraft\\gradlew.bat --no-daemon test --console=plain` | `BUILD SUCCESSFUL`；既有 territory inclusive bounds 與 JUnit 回歸測試通過。 |
+| `C:\\Minecraft\\gradlew.bat --no-daemon build --console=plain` | `BUILD SUCCESSFUL`；Java 25 common／client、三份 locale、JUnit、FoodModel regression、GameTest、jar 與 assemble 通過。 |
+
+### 尚待遊戲內驗收
+
+尚未由玩家在一般世界直接截取 scan invalid hint、building list／inspect 的完整本地化聊天輸出。下一次驗收要故意讓 marker 的 ItemFrame block 位於保存 territory 外，執行 `/civitas building scan`；預期先看到 invalid 統計與診斷 hint，再用 `/civitas building list` 或 `/civitas building inspect <index>` 看到完整的 `marker_outside_territory` 說明。重新圈選包含 ItemFrame 的 inclusive 範圍後再次 scan，預期變為 valid，且領地內箱子物品不需搬動、掉落或清空。
+
+### 下一步
+
+完成上述聊天文案人工驗收後，再考慮是否需要針對其他 validation reason 提供同等程度的操作提示；目前不新增 per-reason scan 統計，避免把診斷需求擴大成不必要的資料模型變更。

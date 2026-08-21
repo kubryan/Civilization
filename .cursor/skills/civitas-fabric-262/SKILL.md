@@ -615,3 +615,12 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 - 禁止：不要把 Java list 的 0-based offset 暴露給玩家；不要用 legacy roster 判斷「沒有被指派」；不要把 chunk unload／body 暫時不存在當成 removed lifecycle。
 - 查證：使用既有已查證的 `ServerLevel.getEntityInAnyDimension(UUID)` 與 server level iteration；本次未新增未查證 Fabric 26.2 API。JUnit command-tree 與 registry-only unassign regression 已加入，驗證日期 2026-08-22。
 
+
+
+## 2026-08-22 — Warehouse marker territory diagnostics
+
+Warehouse marker 的 territory 是 marker ItemStack 上保存的 normalized inclusive cuboid。`WarehouseTerritoryValidator.validate(...)` 以 ItemFrame 的 `blockPosition()` 判斷，三軸都必須滿足 `min <= position <= max`；`marker_outside_territory` 是正確的 server validation result，不是自動把範圍外 marker 認成有效。
+
+玩家可見診斷規則：`/civitas building list` 與 `building inspect` 的 validation reason 必須經由 `buildingValidationReason(...)` 與 locale 顯示可操作文字；`/civitas building scan` 在 `invalid > 0` 時額外顯示本地化提示，引導玩家查 list／inspect。`marker_outside_territory` 的提示必須說明：ItemFrame 所在方塊不在已保存領地內，需重新圈選並確保範圍包含 ItemFrame；不要要求玩家搬動、重放或清空領地內容器。
+
+本次不新增 per-reason 持久化欄位：`BuildingScanSummary` 仍只回傳 aggregate counts，scan hint 採通用 invalid 指引，具體 reason 由 list／inspect 顯示。三份 locale 必須同步，zh_cn 依專案政策沿用繁體中文。
