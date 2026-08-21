@@ -36,7 +36,8 @@ public final class FoodModelRegressionTest {
 			checkResidenceCapacityRoster();
 			checkBuildingSettlementBinding();
 			checkBuildingGeometryValidator();
-			checkWarehouseTerritoryBounds();
+							checkWarehouseTerritoryBounds();
+
 			System.out.println("FoodModelRegressionTest: PASS");
 	}
 
@@ -404,7 +405,10 @@ public final class FoodModelRegressionTest {
 			}
 		}
 
+				
+
 		private static SettlementAdapter settlement(long foodStock, int stabilityDebt, int stability) {
+
 		return settlementAt("test:village", 0, 64, 0, foodStock, stabilityDebt, stability);
 	}
 

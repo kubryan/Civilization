@@ -3425,3 +3425,45 @@ AI 概念圖先以對稱市政建築作為視覺基準，再經透明背景處�
 
 - [1] 專案現有 `BuildingFunction.java`、`BuildingMarkerRegistry.java` 與 `CivitasBuildingMarkerItem.java`。
 - [2] `imagegen` skill 的 game asset、transparent asset 與 lightweight validation 規則。
+
+
+## 2026-08-21 — 取消 marker 切換物品時自動清除座標
+
+### 變更
+
+依照玩家操作體驗回饋，移除 `CivitasBuildingMarkerItem.inventoryTick(...)` 中「當 marker 不在手上時清除 pending point-A」的機制。現在玩家可以左鍵設定 A 點後切換快捷欄、暫時拿其他物品或整理背包，再拿回同一個 marker 右鍵設定 B 點；已完成的 WarehouseTerritory 也不受任何影響。
+
+保留必要的資料安全邊界：右鍵 B 點時若兩點位於不同維度，`WarehouseTerritory.complete(...)` 仍會清除不相容的 pending selection 並回傳 `DIFFERENT_DIMENSION`；若領地超出軸長或體積限制，則保留 A 點讓玩家重新選擇 B 點，而不是丟失整個選點流程。切換手持物品不再是取消條件。
+
+同步移除三份 locale 中已不再使用的 `civilizationmod.building.selection.cancelled` stale key。原本 `WarehouseTerritory.clearPendingSelection(...)` 保留給跨維度錯誤與其他明確 server-side 清理路徑使用，沒有刪除資料層能力。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivitasBuildingMarkerItem.java`：移除 inventory tick 依 equipment slot 自動清除 pending selection 的 override 與不再使用的 imports。
+- `src/test/java/com/civilizationmod/FoodModelRegressionTest.java`：還原未適合 headless registry 環境的 ItemStack 測試嘗試，保留既有純 Java regression suite。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：移除英文 stale cancellation key。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`、`zh_cn.json`：同步移除繁體中文 stale cancellation key。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md`、全域 skill：同步記錄新的選點保存規則。
+- `Mods.md`：追加本次行為變更、邊界與驗證結果。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- 行為查證：確認舊清除唯一位於 `CivitasBuildingMarkerItem.inventoryTick(...)`，`WarehouseTerritory.complete(...)` 的跨維度清除仍保留。
+- 初次 regression 嘗試失敗：新增的 `ItemStack` pending-selection 測試在 headless `runFoodModelRegressionTest` 環境觸發 `CivilizationItems`／Minecraft registry 初始化的 `ExceptionInInitializerError`；該測試與正式功能無關，已移除並清理暫存 `regression_failure.log`，沒有把未通過測試宣稱為成功。
+- 命令：`gradlew.bat --no-daemon runFoodModelRegressionTest compileJava compileClientJava build --console=plain`；結果：`BUILD SUCCESSFUL`，`FoodModelRegressionTest: PASS`。
+- 命令：`gradlew.bat --no-daemon runClient --console=plain`；結果：Fabric loader、Render thread、texture atlas 與 client initialization 成功；Realms 授權訊息屬開發環境服務訊息，測試完成後已停止 client。
+- `git diff --check`：通過；沒有保留本次診斷暫存檔。
+
+### 未完成與風險
+
+目前 automated regression 能確認既有模型與建築邏輯未被破壞，但沒有在 headless test 中直接模擬玩家切換快捷欄，因為那需要完整 Minecraft entity／inventory runtime。這次行為修正本身是移除唯一會清除座標的 `inventoryTick` 路徑，仍需玩家在遊戲中實際驗收。
+
+### 下一步
+
+在遊戲內使用 warehouse marker 或 residential marker 左鍵設定 A 點，切換到其他快捷欄物品，等待幾秒後再切回同一 marker；查看 tooltip 確認 A 點仍存在，再右鍵方塊完成 B 點。另測試跨維度或超大範圍錯誤，確認只有明確的 server-side 無效條件會改變 pending selection。
+
+### 來源
+
+- [1] 專案 `CivitasBuildingMarkerItem.java` 與 `WarehouseTerritory.java`，行為查證日期 2026-08-21。
+- [2] 專案 `FoodModelRegressionTest.java` 與 Gradle `runFoodModelRegressionTest` 實際輸出，日期 2026-08-21。

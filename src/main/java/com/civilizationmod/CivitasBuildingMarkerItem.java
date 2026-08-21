@@ -7,8 +7,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
+
+
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -124,17 +124,7 @@ public class CivitasBuildingMarkerItem extends Item {
         return InteractionResult.FAIL;
     }
 
-    @Override
-    public void inventoryTick(ItemStack stack, ServerLevel level, Entity entity, EquipmentSlot equipmentSlot) {
-        if (equipmentSlot == null
-                && WarehouseTerritory.hasPendingSelection(stack)) {
-            WarehouseTerritory.clearPendingSelection(stack);
-            if (entity instanceof Player player) {
-                player.sendSystemMessage(CivilizationMessages.translatable(
-                        "civilizationmod.building.selection.cancelled"));
-            }
-        }
-    }
+    
 
     private static InteractionResult handleAttackBlock(
             Player player,

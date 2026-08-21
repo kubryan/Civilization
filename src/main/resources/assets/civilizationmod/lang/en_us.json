@@ -117,7 +117,7 @@
   "civilizationmod.warehouse.deploy.duplicate": "This warehouse territory already has a valid Marker.",
   "civilizationmod.building.selection.point_a": "Building territory point A set at (%1$d, %2$d, %3$d). Right-click a block while holding this marker to set point B.",
   "civilizationmod.building.selection.complete": "Building territory set: (%1$d, %2$d, %3$d) -> (%4$d, %5$d, %6$d). Place this marker in an ItemFrame inside the territory.",
-  "civilizationmod.building.selection.cancelled": "Pending building territory selection cancelled because this marker is no longer held.",
+  
   "civilizationmod.building.selection.no_first_point": "Set building territory point A with left-click before setting point B.",
   "civilizationmod.building.selection.different_dimension": "Building territory points must be in the same dimension.",
   "civilizationmod.building.selection.too_large": "Building territory is too large. Each axis is limited to 64 blocks and total volume to 262144 blocks.",

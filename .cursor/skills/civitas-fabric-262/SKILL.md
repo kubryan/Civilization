@@ -388,3 +388,13 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：在 `TOWN_HALL` 功能、殖民地核心 SavedData、範圍、居民上限與建築解鎖規則決定前，不把 Town Hall 加入 `BuildingMarkerRegistry`，避免共用 territory selection 或 building scan 提前把 prototype 當成可運作建築。
 - 禁止：不要把市政廳 marker 當成已完成 Town Hall 功能宣稱；不要在尚未定義 server 規則前複製 warehouse／residence validation branch。
 - 查證：`BuildingFunction.java`、`BuildingMarkerRegistry.java`、`CivilizationItems.java` 與 26.2 build/runClient smoke test；日期 2026-08-21。
+
+
+## 2026-08-21 — marker 選點不因切換手持物而取消
+
+- 任務：降低領地選點操作的使用負擔。
+- 已確認：舊機制在 `CivitasBuildingMarkerItem.inventoryTick(...)` 以 `equipmentSlot == null` 判定 marker 不在手上，呼叫 `WarehouseTerritory.clearPendingSelection(...)`；玩家現在要求移除這項自動清除。
+- 採用：移除 base marker 的 `inventoryTick` 清除邏輯；A 點、已完成領地與 CustomData 在切換快捷欄後保留。跨維度 B 點仍由 `WarehouseTerritory.complete(...)` 清除不相容 pending selection；超大領地仍保留 A 點讓玩家重選 B。
+- 採用：移除 `civilizationmod.building.selection.cancelled` stale locale key，並新增 regression 確認 pending A 在 ItemStack copy 後仍可完成 territory。
+- 禁止：不要再用目前手持物或 equipment slot 自動推導玩家是否要取消選點。
+- 查證：`CivitasBuildingMarkerItem.java`、`WarehouseTerritory.java`、`FoodModelRegressionTest.java`；日期 2026-08-21。

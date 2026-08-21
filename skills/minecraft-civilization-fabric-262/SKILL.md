@@ -484,3 +484,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 在 `BuildingFunction` 尚未加入 `TOWN_HALL`、`BuildingMarkerRegistry` 尚未定義 Town Hall metadata、殖民地範圍／居民上限／建築解鎖規則尚未決定前，市政廳 item 應保持純視覺 prototype，不要把它註冊成可掃描 building marker 或讓共用 territory selection callback 誤把它當成 warehouse／residence。完成資產後的下一個最小功能切片才是 server-authoritative Town Hall registration、單一殖民地核心與基礎範圍規則。
 
 查證：現有 `BuildingFunction` 只有 WAREHOUSE／RESIDENCE，`BuildingMarkerRegistry.registerDefaults()` 只有 warehouse 與 residence；本次 `compileJava`、`compileClientJava`、`build` 與 `runClient` smoke test 通過；日期 2026-08-21。
+
+
+## 已確認：marker 選點不因切換手持物而取消（2026-08-21）
+
+玩家決定取消「沒有手持 marker 就清除座標」的便利性限制。`CivitasBuildingMarkerItem` 不再覆寫 `inventoryTick` 清除 pending point-A；玩家可以先左鍵設定 A 點、切換快捷欄或暫時拿其他物品，再拿回同一個 marker 右鍵設定 B 點。A/B 與已完成 `WarehouseTerritory` 仍由 ItemStack 的 `DataComponents.CUSTOM_DATA` 保存。
+
+新的資料生命週期是：左鍵寫入 pending A；右鍵同維度 B 成功後轉為 completed territory；右鍵不同維度時仍由 `WarehouseTerritory.complete(...)` 清除不相容的 pending selection 並回傳 `DIFFERENT_DIMENSION`；過大範圍仍保留 pending A，讓玩家可重新選 B。切換物品不再是取消條件，舊的 `civilizationmod.building.selection.cancelled` 玩家文案同步移除。
+
+採用：回歸測試鎖定 pending A 可在 marker stack copy 後保留，並可成功完成 territory。不要讓 inventory tick 依目前 equipment slot 推導選點資料生命週期。

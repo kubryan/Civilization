@@ -117,7 +117,7 @@
   "civilizationmod.warehouse.deploy.duplicate": "這個 warehouse 領地已經有有效的倉庫標識。",
   "civilizationmod.building.selection.point_a": "已設定建築領地 A 點：（%1$d，%2$d，%3$d）。請在仍手持此標誌時右鍵另一個方塊設定 B 點。",
   "civilizationmod.building.selection.complete": "已設定建築領地：（%1$d，%2$d，%3$d）→（%4$d，%5$d，%6$d）。請將此標誌放入領地內的物品展示框。",
-  "civilizationmod.building.selection.cancelled": "因為不再手持此標誌，尚未完成的建築領地選取已取消。",
+  
   "civilizationmod.building.selection.no_first_point": "請先左鍵設定建築領地 A 點，再設定 B 點。",
   "civilizationmod.building.selection.different_dimension": "建築領地的兩個選取點必須位於同一個維度。",
   "civilizationmod.building.selection.too_large": "建築領地太大；每個軸最多 64 格，總體積最多 262144 格。",
