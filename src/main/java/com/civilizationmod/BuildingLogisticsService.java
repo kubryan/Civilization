@@ -41,8 +41,10 @@ public final class BuildingLogisticsService {
                 || villager == null
                 || !villager.isAlive()
                 || villager.isTrading()
-                || !BuildingFunction.WAREHOUSE.id().equals(building.functionId())
-                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                                || !BuildingFunction.WAREHOUSE.id().equals(building.functionId())
+                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
+                || !building.isColonyBound()) {
+
             return false;
         }
 

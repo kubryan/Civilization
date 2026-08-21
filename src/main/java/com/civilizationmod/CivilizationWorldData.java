@@ -13,8 +13,10 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -173,10 +175,35 @@ public final class CivilizationWorldData extends SavedData {
                 .orElse(null);
     }
 
+    public TownHallCore getTownHallCore(int oneBasedIndex) {
+        if (oneBasedIndex < 1 || oneBasedIndex > this.townHallCores.size()) {
+            return null;
+        }
+        return this.townHallCores.get(oneBasedIndex - 1);
+    }
+
+    public List<TownHallCore> getTownHallCores(String dimension) {
+        if (dimension == null || dimension.isBlank()) {
+            return List.of();
+        }
+        return this.townHallCores.stream()
+                .filter(core -> dimension.equals(core.dimension()))
+                .toList();
+    }
+
     public TownHallRegistration registerTownHall(
             String dimension,
             BlockPos markerPosition,
             long observedAt
+    ) {
+        return registerTownHall(dimension, markerPosition, observedAt, TownHallCore.DEFAULT_RADIUS);
+    }
+
+    public TownHallRegistration registerTownHall(
+            String dimension,
+            BlockPos markerPosition,
+            long observedAt,
+            int radius
     ) {
         if (dimension == null || dimension.isBlank() || markerPosition == null) {
             return new TownHallRegistration(TownHallRegistrationStatus.INVALID, null);
@@ -190,15 +217,94 @@ public final class CivilizationWorldData extends SavedData {
             return new TownHallRegistration(TownHallRegistrationStatus.EXISTING, existingAtMarker);
         }
 
-        TownHallCore existingInDimension = getTownHallCore(dimension);
-        if (existingInDimension != null) {
-            return new TownHallRegistration(TownHallRegistrationStatus.DUPLICATE, existingInDimension);
+        TownHallCore candidate = TownHallCore.create(dimension, markerPosition, observedAt)
+                .withRadius(radius);
+        for (TownHallCore existing : this.townHallCores) {
+            if (candidate.overlaps(existing)) {
+                return new TownHallRegistration(TownHallRegistrationStatus.DUPLICATE, existing);
+            }
         }
 
-        TownHallCore created = TownHallCore.create(dimension, markerPosition, observedAt);
-        this.townHallCores.add(created);
+        this.townHallCores.add(candidate);
+        this.refreshColonyBindings();
         this.setDirty();
-        return new TownHallRegistration(TownHallRegistrationStatus.REGISTERED, created);
+        return new TownHallRegistration(TownHallRegistrationStatus.REGISTERED, candidate);
+    }
+
+    public TownHallRadiusUpdate updateTownHallRadius(int oneBasedIndex, int radius) {
+        TownHallCore current = getTownHallCore(oneBasedIndex);
+        if (current == null || radius < 1 || radius > TownHallCore.MAX_RADIUS) {
+            return new TownHallRadiusUpdate(TownHallRadiusUpdateStatus.INVALID, current);
+        }
+        TownHallCore candidate = current.withRadius(radius);
+        if (candidate.equals(current)) {
+            return new TownHallRadiusUpdate(TownHallRadiusUpdateStatus.UNCHANGED, current);
+        }
+        for (TownHallCore other : this.townHallCores) {
+            if (other != current && candidate.overlaps(other)) {
+                return new TownHallRadiusUpdate(TownHallRadiusUpdateStatus.OVERLAPPING, other);
+            }
+        }
+        this.townHallCores.set(oneBasedIndex - 1, candidate);
+        this.refreshColonyBindings();
+        this.setDirty();
+        return new TownHallRadiusUpdate(TownHallRadiusUpdateStatus.UPDATED, candidate);
+    }
+
+    private int refreshColonyBindings() {
+        int changed = 0;
+        for (int index = 0; index < this.buildings.size(); index++) {
+            BuildingObservation building = this.buildings.get(index);
+            TownHallBinding binding = findTownHallBinding(
+                    building.dimension(),
+                    new BlockPos(building.markerX(), building.markerY(), building.markerZ()));
+            TownHallCore core = binding.core();
+            String reason;
+            if (!BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                core = null;
+                reason = BuildingObservation.COLONY_REASON_BUILDING_INVALID;
+            } else {
+                reason = switch (binding.status()) {
+                    case BOUND -> BuildingObservation.COLONY_REASON_BOUND;
+                    case OUTSIDE -> BuildingObservation.COLONY_REASON_OUTSIDE_TOWN_HALL;
+                    case OVERLAPPING -> BuildingObservation.COLONY_REASON_OVERLAPPING_TOWN_HALL;
+                    case NO_TOWN_HALL -> BuildingObservation.COLONY_REASON_NO_TOWN_HALL;
+                };
+            }
+            String status = core == null
+                    ? BuildingObservation.STATUS_UNBOUND
+                    : BuildingObservation.STATUS_BOUND;
+            String colonyId = core == null ? "" : core.colonyId();
+            BuildingObservation replacement = building.withColonyBinding(status, colonyId, reason);
+            if (!building.equals(replacement)) {
+                this.buildings.set(index, replacement);
+                changed++;
+            }
+        }
+        if (changed > 0) {
+            this.setDirty();
+        }
+        return changed;
+    }
+
+    public TownHallBinding findTownHallBinding(String dimension, BlockPos position) {
+        if (dimension == null || dimension.isBlank() || position == null) {
+            return new TownHallBinding(TownHallBindingStatus.NO_TOWN_HALL, null);
+        }
+        List<TownHallCore> containing = this.townHallCores.stream()
+                .filter(core -> dimension.equals(core.dimension()) && core.contains(position))
+                .toList();
+        if (containing.size() > 1) {
+            return new TownHallBinding(TownHallBindingStatus.OVERLAPPING, null);
+        }
+        if (containing.size() == 1) {
+            return new TownHallBinding(TownHallBindingStatus.BOUND, containing.get(0));
+        }
+        boolean hasSameDimension = this.townHallCores.stream()
+                .anyMatch(core -> dimension.equals(core.dimension()));
+        return new TownHallBinding(
+                hasSameDimension ? TownHallBindingStatus.OUTSIDE : TownHallBindingStatus.NO_TOWN_HALL,
+                null);
     }
 
     public record TownHallRegistration(TownHallRegistrationStatus status, TownHallCore core) {
@@ -209,6 +315,29 @@ public final class CivilizationWorldData extends SavedData {
         EXISTING,
         DUPLICATE,
         INVALID
+    }
+
+    public record TownHallRadiusUpdate(TownHallRadiusUpdateStatus status, TownHallCore core) {
+    }
+
+    public enum TownHallRadiusUpdateStatus {
+        UPDATED,
+        UNCHANGED,
+        OVERLAPPING,
+        INVALID
+    }
+
+    public record TownHallBinding(TownHallBindingStatus status, TownHallCore core) {
+        public boolean isBound() {
+            return status == TownHallBindingStatus.BOUND && core != null;
+        }
+    }
+
+    public enum TownHallBindingStatus {
+        BOUND,
+        NO_TOWN_HALL,
+        OUTSIDE,
+        OVERLAPPING
     }
 
 
@@ -320,21 +449,46 @@ public final class CivilizationWorldData extends SavedData {
         int bound = 0;
         int valid = 0;
         int invalid = 0;
-        int townHallsRegistered = 0;
+                int townHallsRegistered = 0;
         int townHallConflicts = 0;
         Set<WarehouseTerritory> claimedTerritories = new HashSet<>();
+        Map<String, TownHallRegistration> townHallRegistrations = new HashMap<>();
+
+        // Register all valid Town Halls first so buildings found earlier in the
+        // scanner order can still bind to a core found later in the same scan.
+        for (BuildingMarkerScanner.MarkerCandidate candidate : candidates) {
+            if (!BuildingFunction.TOWN_HALL.id().equals(candidate.functionId())) {
+                continue;
+            }
+            BuildingGeometryValidator.ValidationResult townHallValidation = BuildingGeometryValidator.validate(
+                    level,
+                    candidate.frame(),
+                    candidate.functionId());
+            if (!townHallValidation.isValid()) {
+                continue;
+            }
+            BlockPos position = candidate.position();
+            TownHallRegistration registration = registerTownHall(dimension, position, observedAt);
+            townHallRegistrations.put(buildingKey(dimension, position), registration);
+            if (registration.status() == TownHallRegistrationStatus.REGISTERED) {
+                townHallsRegistered++;
+            } else if (registration.status() == TownHallRegistrationStatus.DUPLICATE) {
+                townHallConflicts++;
+            }
+        }
 
         for (BuildingMarkerScanner.MarkerCandidate candidate : candidates) {
+
             BlockPos position = candidate.position();
-            SettlementAdapter settlement = findSettlementForBuilding(
+                        SettlementAdapter settlement = findSettlementForBuilding(
                     dimension,
                     position.getX(),
                     position.getY(),
                     position.getZ());
-            String status = settlement == null
-                    ? BuildingObservation.STATUS_UNBOUND
-                    : BuildingObservation.STATUS_BOUND;
+            TownHallBinding townHallBinding = findTownHallBinding(dimension, position);
+            TownHallRegistration townHallRegistration = townHallRegistrations.get(buildingKey(dimension, position));
             BuildingMarkerRegistry.MarkerDefinition markerDefinition =
+
                     BuildingMarkerRegistry.definition(candidate.frame().getItem());
             int capacity = markerDefinition == null ? 0 : markerDefinition.capacity();
             int bedCount = 0;
@@ -358,10 +512,10 @@ public final class CivilizationWorldData extends SavedData {
                         candidate.functionId());
             }
 
-            boolean duplicateTerritory = validation.isValid()
+                        boolean duplicateTerritory = validation.isValid()
                     && WarehouseTerritory.read(candidate.frame().getItem())
-                    .map(territory -> !claimedTerritories.add(territory))
-                    .orElse(false);
+                            .map(territory -> !claimedTerritories.add(territory))
+                            .orElse(false);
             if (duplicateTerritory) {
                 validation = new BuildingGeometryValidator.ValidationResult(
                         BuildingObservation.VALIDATION_INVALID,
@@ -370,7 +524,45 @@ public final class CivilizationWorldData extends SavedData {
                         0,
                         0);
             }
+
+            boolean townHallConflict = BuildingFunction.TOWN_HALL.id().equals(candidate.functionId())
+                    && townHallRegistration != null
+                    && townHallRegistration.status() == TownHallRegistrationStatus.DUPLICATE;
+            if (townHallConflict) {
+                validation = new BuildingGeometryValidator.ValidationResult(
+                        BuildingObservation.VALIDATION_INVALID,
+                        BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL,
+                        0,
+                        0,
+                        0);
+            }
+
+            TownHallCore colonyCore = null;
+            String colonyReason;
+            if (townHallConflict) {
+                colonyReason = BuildingObservation.COLONY_REASON_TOWN_HALL_CONFLICT;
+            } else if (!validation.isValid()) {
+                colonyReason = BuildingObservation.COLONY_REASON_BUILDING_INVALID;
+            } else if (BuildingFunction.TOWN_HALL.id().equals(candidate.functionId())) {
+                colonyCore = townHallRegistration == null ? null : townHallRegistration.core();
+                colonyReason = colonyCore == null
+                        ? BuildingObservation.COLONY_REASON_TOWN_HALL_CONFLICT
+                        : BuildingObservation.COLONY_REASON_BOUND;
+            } else {
+                colonyCore = townHallBinding.core();
+                colonyReason = switch (townHallBinding.status()) {
+                    case BOUND -> BuildingObservation.COLONY_REASON_BOUND;
+                    case OUTSIDE -> BuildingObservation.COLONY_REASON_OUTSIDE_TOWN_HALL;
+                    case OVERLAPPING -> BuildingObservation.COLONY_REASON_OVERLAPPING_TOWN_HALL;
+                    case NO_TOWN_HALL -> BuildingObservation.COLONY_REASON_NO_TOWN_HALL;
+                };
+            }
+            String status = colonyCore == null
+                    ? BuildingObservation.STATUS_UNBOUND
+                    : BuildingObservation.STATUS_BOUND;
+            String colonyId = colonyCore == null ? "" : colonyCore.colonyId();
             String settlementDimension = settlement == null ? "" : settlement.dimension();
+
             int settlementX = settlement == null ? 0 : settlement.centerX();
             int settlementY = settlement == null ? 0 : settlement.centerY();
             int settlementZ = settlement == null ? 0 : settlement.centerZ();
@@ -398,13 +590,16 @@ public final class CivilizationWorldData extends SavedData {
                         settlementDimension,
                         settlementX,
                         settlementY,
-                        settlementZ,
+                                                settlementZ,
                         capacity,
                         bedCount,
                         "",
                         "",
                         storageSnapshot.scanned() ? storageSnapshot : BuildingStorageSnapshot.unscanned(),
-                        List.of());
+                        List.of(),
+                        colonyId,
+                        colonyReason);
+
             } else {
                 observation = existing.refreshed(
                         candidate.functionId(),
@@ -426,31 +621,18 @@ public final class CivilizationWorldData extends SavedData {
                 }
                         }
 
-            if (BuildingFunction.TOWN_HALL.id().equals(candidate.functionId())
-                    && validation.isValid()) {
-                TownHallRegistration registration = registerTownHall(dimension, position, observedAt);
-                if (registration.status() == TownHallRegistrationStatus.REGISTERED) {
-                    townHallsRegistered++;
-                } else if (registration.status() == TownHallRegistrationStatus.DUPLICATE) {
-                    townHallConflicts++;
-                    validation = new BuildingGeometryValidator.ValidationResult(
-                            BuildingObservation.VALIDATION_INVALID,
-                            BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL,
-                            0,
-                            0,
-                            0);
-                    observation = observation.withValidation(
-                            BuildingObservation.VALIDATION_INVALID,
-                            BuildingObservation.VALIDATION_REASON_DUPLICATE_TOWN_HALL);
-                }
-            }
+            observation = observation.withColonyBinding(status, colonyId, colonyReason);
 
             if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())
                     && observation.residentCount() > capacity
                     && BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
                 observation = observation.withValidation(
                         BuildingObservation.VALIDATION_INVALID,
-                        BuildingObservation.VALIDATION_REASON_RESIDENTS_OVER_CAPACITY);
+                        BuildingObservation.VALIDATION_REASON_RESIDENTS_OVER_CAPACITY)
+                        .withColonyBinding(
+                                BuildingObservation.STATUS_UNBOUND,
+                                "",
+                                BuildingObservation.COLONY_REASON_BUILDING_INVALID);
             }
             BuildingMarkerVisualState.apply(
                     candidate.frame(),
@@ -475,9 +657,10 @@ public final class CivilizationWorldData extends SavedData {
                 }
                 updated++;
             }
-            if (settlement != null) {
+                        if (observation.isColonyBound()) {
                 bound++;
             }
+
             if (BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
                 valid++;
             } else {
@@ -499,7 +682,12 @@ public final class CivilizationWorldData extends SavedData {
 
     }
 
+        private static String buildingKey(String dimension, BlockPos position) {
+        return dimension + "@" + position.getX() + "," + position.getY() + "," + position.getZ();
+    }
+
     SettlementAdapter findSettlementForBuilding(String dimension, int markerX, int markerY, int markerZ) {
+
         return findSettlementForMarker(dimension, new BlockPos(markerX, markerY, markerZ));
     }
 
@@ -581,17 +769,19 @@ public final class CivilizationWorldData extends SavedData {
         }
 
         if (removed > 0) {
+            this.refreshColonyBindings();
             this.setDirty();
         }
         return removed;
     }
 
     private int removeDuplicateTownHallCores() {
-        Set<String> dimensions = new HashSet<>();
+        Set<String> markers = new HashSet<>();
         int removed = 0;
         for (int index = this.townHallCores.size() - 1; index >= 0; index--) {
             TownHallCore core = this.townHallCores.get(index);
-            if (!dimensions.add(core.dimension())) {
+            String markerKey = core.dimension() + "@" + core.markerX() + "," + core.markerY() + "," + core.markerZ();
+            if (!markers.add(markerKey)) {
                 this.townHallCores.remove(index);
                 removed++;
             }

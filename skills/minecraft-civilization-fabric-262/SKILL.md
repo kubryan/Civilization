@@ -569,3 +569,16 @@ Fabric 官方 [Automated Testing 26.2](https://docs.fabricmc.net/develop/automat
 JUnit 設定採 `testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"` 與 `test { useJUnitPlatform() }`。測試若觸及 registry-dependent 類別，`@BeforeAll` 必須先呼叫 `SharedConstants.tryDetectVersion()` 與 `Bootstrap.bootStrap()`。本專案保留相容的 `runFoodModelRegressionTest` JavaExec，另以 `CivitasCoreTest` 納入 JUnit；Gradle `check` 依賴既有 regression task，因此 `build` 會同時執行兩層 common-side 回歸檢查。
 
 第一批 JUnit 覆蓋 FoodDemandModel、SettlementAdapter 去重與狀態保留、BuildingObservation roster／Codec、building 維度與範圍綁定、WarehouseTerritory 邊界、Town Hall 唯一性與 Codec。ItemFrame 真實掃描、SavedData reload、居民互動、背包／物流與 client renderer 留待 GameTest；不要把 client-only renderer 測試放入 common `src/test/java`，未建立 Loom GameTest source set 且未實際執行前，不得宣稱 server/client gameplay 已覆蓋。
+
+
+## 已採用：Town Hall 可設定範圍與 colony_id 歸屬切片（2026-08-21）
+
+Town Hall 不再限制為每個維度一座；每個核心保存自己的 `colony_id`、dimension、marker 座標與 radius。`TownHallCore.DEFAULT_RADIUS` 為 64，`MAX_RADIUS` 為 512；`contains(BlockPos)` 使用以 marker 為中心的 inclusive axis-aligned cubic range。兩個同維度核心以三軸距離是否小於等於兩者半徑總和判定範圍重疊；不同維度不互相衝突。
+
+`CivilizationWorldData.registerTownHall(dimension, marker, observedAt, radius)` 的規則是：同一 marker 回傳 `EXISTING`；新核心若與任何同維度既有核心範圍重疊，回傳 `DUPLICATE` 且不寫入；不重疊核心可在同維度並存，跨維度也可並存。`updateTownHallRadius(index, radius)` 限制 1–512，若新半徑造成重疊則回傳 `OVERLAPPING` 且保留舊半徑。`/civitas townhall radius <index> <radius>` 與 `/civilization` 相容別名提供動態 Town Hall index 與常用半徑 Tab completion。
+
+有效住宅與 warehouse 以 marker 維度／座標呼叫 `findTownHallBinding`。唯一核心包含該位置時，BuildingObservation 寫入 `status=bound`、`colony_id` 與 `colony_binding_reason=bound`；沒有核心、位於所有核心範圍外或位於重疊範圍時，分別保存 `no_town_hall`、`outside_town_hall` 或 `overlapping_town_hall`，不參與居民導航、warehouse 物流、assign 或通用綁定裝置。Town Hall marker 本身若和既有範圍衝突，保留 observation 但標記 `duplicate_town_hall` invalid。
+
+BuildingObservation 將 `colony_id` 與 `colony_binding_reason` 放入既有 nested CodecTail 的 optional fields，確保舊 `resident_uuid`、`resident_name`、storage 與 roster 資料可載入；legacy status 可保留但沒有 colony_id 時不視為 `isColonyBound()`。新增或更新 Town Hall 半徑後會即時 refresh 已保存建築的 colony binding；結構 invalid 的建築不保留可運作 colony binding。
+
+驗證：`compileJava compileClientJava test`、`runDatagen`、`runFoodModelRegressionTest` 與完整 `build` 均通過；`CivitasCoreTest` 新增多核心不重疊、半徑更新拒絕重疊、跨維度並存、Town Hall binding status 與 BuildingObservation colony Codec 測試。

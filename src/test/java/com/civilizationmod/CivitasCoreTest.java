@@ -103,10 +103,19 @@ class CivitasCoreTest {
         assertEquals(2, refreshed.residentCount());
         assertEquals("Resident Two", refreshed.residents().get(1).name());
 
-        var encoded = BuildingObservation.CODEC.encodeStart(JsonOps.INSTANCE, assigned).getOrThrow();
+        BuildingObservation colonyBound = assigned.withColonyBinding(
+                BuildingObservation.STATUS_BOUND,
+                "minecraft:overworld@townhall",
+                BuildingObservation.COLONY_REASON_BOUND);
+        assertTrue(colonyBound.isColonyBound());
+        assertEquals("minecraft:overworld@townhall", colonyBound.colonyId());
+
+        var encoded = BuildingObservation.CODEC.encodeStart(JsonOps.INSTANCE, colonyBound).getOrThrow();
         BuildingObservation decoded = BuildingObservation.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
         assertEquals(2, decoded.residentCount());
         assertEquals("Resident Two", decoded.residents().get(1).name());
+        assertEquals("minecraft:overworld@townhall", decoded.colonyId());
+        assertEquals(BuildingObservation.COLONY_REASON_BOUND, decoded.colonyBindingReason());
         assertEquals(1, residence.withResident(RESIDENT_ONE, "Legacy Resident").residentCount());
     }
 
@@ -164,7 +173,7 @@ class CivitasCoreTest {
     }
 
     @Test
-    void townHallIsIdempotentPerDimensionAndCodecCompatible() {
+    void townHallRangesCanBeConfiguredWithoutOverlapAndRemainCodecCompatible() {
         CivilizationWorldData data = new CivilizationWorldData();
         BlockPos firstMarker = new BlockPos(100, 70, -40);
 
@@ -184,8 +193,19 @@ class CivitasCoreTest {
         assertSame(CivilizationWorldData.TownHallRegistrationStatus.DUPLICATE, data.registerTownHall(
                 "minecraft:overworld", firstMarker.offset(10, 0, 10), 9999L).status());
         assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED, data.registerTownHall(
+                "minecraft:overworld", firstMarker.offset(180, 0, 0), 2000L).status());
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED, data.registerTownHall(
                 "minecraft:the_nether", firstMarker, 2222L).status());
-        assertEquals(2, data.getTownHallCoreCount());
+        assertEquals(3, data.getTownHallCoreCount());
+        assertSame(CivilizationWorldData.TownHallBindingStatus.BOUND,
+                data.findTownHallBinding("minecraft:overworld", firstMarker.offset(20, 0, 0)).status());
+        assertSame(CivilizationWorldData.TownHallBindingStatus.OUTSIDE,
+                data.findTownHallBinding("minecraft:overworld", firstMarker.offset(500, 0, 0)).status());
+        assertSame(CivilizationWorldData.TownHallRadiusUpdateStatus.OVERLAPPING,
+                data.updateTownHallRadius(1, 128).status());
+        assertSame(CivilizationWorldData.TownHallRadiusUpdateStatus.UPDATED,
+                data.updateTownHallRadius(1, 96).status());
+        assertEquals(96, data.getTownHallCore(1).radius());
 
         var encoded = TownHallCore.CODEC.encodeStart(JsonOps.INSTANCE, core).getOrThrow();
         TownHallCore decoded = TownHallCore.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();

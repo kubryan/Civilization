@@ -94,7 +94,8 @@ public final class BuildingResidentService {
             if (building == null) {
                 continue;
             }
-            boolean buildingValid = BuildingObservation.VALIDATION_VALID.equals(building.validationStatus());
+            boolean buildingValid = BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
+                    && building.isColonyBound();
 
             ServerLevel buildingLevel = findLevel(server, building.dimension());
 

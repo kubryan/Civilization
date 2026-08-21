@@ -55,9 +55,32 @@ public record TownHallCore(
     }
 
     public boolean contains(BlockPos position) {
-        return Math.abs((long) position.getX() - markerX) <= radius
+        return position != null
+                && Math.abs((long) position.getX() - markerX) <= radius
                 && Math.abs((long) position.getY() - markerY) <= radius
                 && Math.abs((long) position.getZ() - markerZ) <= radius;
+    }
+
+    /** Returns whether the two same-dimension cubic colony ranges overlap. */
+    public boolean overlaps(TownHallCore other) {
+        if (other == null || !dimension.equals(other.dimension)) {
+            return false;
+        }
+        long combinedRadius = (long) radius + other.radius;
+        return Math.abs((long) markerX - other.markerX) <= combinedRadius
+                && Math.abs((long) markerY - other.markerY) <= combinedRadius
+                && Math.abs((long) markerZ - other.markerZ) <= combinedRadius;
+    }
+
+    public TownHallCore withRadius(int newRadius) {
+        return new TownHallCore(
+                colonyId,
+                dimension,
+                markerX,
+                markerY,
+                markerZ,
+                createdAt,
+                newRadius);
     }
 
     private static String createColonyId(String dimension, int x, int y, int z) {

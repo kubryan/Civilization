@@ -77,6 +77,7 @@ public final class ResidenceBindingDeviceInteraction {
                 frame.blockPosition().getZ());
         if (building == null
                 || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
+                || !building.isColonyBound()
                 || data.findBuildingMarker(level, building) != frame) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.binding.select.invalid"));
@@ -126,7 +127,8 @@ public final class ResidenceBindingDeviceInteraction {
                 selected.markerY(),
                 selected.markerZ());
         if (building == null
-                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                || !BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())
+                || !building.isColonyBound()) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.binding.bind.invalid_building"));
             return InteractionResult.FAIL;

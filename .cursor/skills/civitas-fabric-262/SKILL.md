@@ -477,3 +477,13 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 目前只保留直接右鍵 ItemFrame 的 `UseEntityCallback` 路徑；其 server 驗證仍包含 territory、維度、牆面附著、重複 marker、CustomData copy 與背包 fallback。
 - air-target 的視線 AABB／dot／line-of-sight 尋找器已撤回；不要把它當成可用功能或重新加入。
 - 查證：Fabric Events／Custom Item Interactions 官方文件、Fabric API 0.158.0+26.2 jar javap；air-target 路徑撤回日期 2026-08-21。
+
+
+## 2026-08-21 — Town Hall 可設定範圍與 colony_id 歸屬切片
+
+- 任務：將 Town Hall 從每維度單一核心改為可設定、不重疊的多核心殖民地。
+- 已確認：`TownHallCore.DEFAULT_RADIUS=64`、`MAX_RADIUS=512`；`contains` 是 inclusive cubic range；同維度 `overlaps` 以三軸距離與半徑總和判定。
+- 採用：同 marker `EXISTING`、新核心不重疊 `REGISTERED`、重疊 `DUPLICATE`；`/civitas townhall radius <index> <radius>` 有 index／常用半徑 Tab completion；有效住宅／warehouse 只有唯一核心包含時才保存 `colony_id` 並成為 `isColonyBound()`。
+- 採用：沒有核心、範圍外、重疊範圍分別保存 `no_town_hall`、`outside_town_hall`、`overlapping_town_hall`；未 colony-bound 建築不參與導航、物流、assign 或綁定裝置。
+- 採用：`BuildingObservation` 新欄位放在 nested CodecTail optional fields；legacy status 可保留但沒有 colony_id 不算 colony-bound。
+- 驗證：`compileJava compileClientJava test`、`runDatagen`、`runFoodModelRegressionTest`、`build` 均成功；日期 2026-08-21。

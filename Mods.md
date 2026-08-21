@@ -3917,3 +3917,50 @@ test { useJUnitPlatform() }
 - [1] https://docs.fabricmc.net/develop/events — Fabric Events 26.2。
 - [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions 26.2。
 - [3] 本機 Minecraft 26.2／Fabric API 0.158.0+26.2 compile 與 `build` 驗證，日期 2026-08-21。
+
+
+## 2026-08-21 — Town Hall 可設定範圍與殖民地 colony_id 歸屬切片
+
+### 變更
+
+本次將市政廳規則由「每個維度只能一座」調整為「每座市政廳擁有自己的可設定範圍」。同一維度可以有多座 Town Hall，但新核心的 cubic range 不得與既有核心範圍重疊；不同維度的核心可以並存。Town Hall 預設半徑維持 64，最大半徑為 512。
+
+新增同維度 AABB／cubic range overlap 判定。相同 marker 重掃仍回傳 `EXISTING`；新核心與任何既有核心重疊時回傳 `DUPLICATE`，不寫入；範圍不重疊的新核心回傳 `REGISTERED`。新增 `/civitas townhall radius <index> <radius>`，並由 `/civilization` 相容別名共用相同 handler、驗證與 Tab completion；半徑更新若會與其他核心重疊則拒絕並保留舊值。
+
+有效住宅與 warehouse 現在會依同維度及 marker 座標尋找唯一 Town Hall。成功時將 `colony_id` 與 `colony_binding_reason=bound` 寫入 `BuildingObservation`；沒有市政廳、超出所有市政廳範圍或位於重疊範圍時，分別保存 `no_town_hall`、`outside_town_hall`、`overlapping_town_hall`，不參與居民導航、warehouse 物流、`assign` 或通用綁定裝置。Town Hall 自身若與既有範圍衝突，保留 observation 但標記 `duplicate_town_hall` invalid。
+
+`BuildingObservation` 新增 `colony_id` 與 `colony_binding_reason`，放入既有 nested `CodecTail` 的 optional fields，保留舊 resident、roster 與 storage SavedData 相容性。新增或調整 Town Hall 半徑後會即時刷新既有 building 的 colony binding；legacy building 的舊 `status=bound` 可讀取，但沒有 colony_id 時不視為 `isColonyBound()`。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/TownHallCore.java`：新增 `MAX_RADIUS`、`overlaps` 與半徑更新 helper。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：支援多核心註冊、半徑更新、Town Hall binding resolver、SavedData refresh 與同 marker 去重。
+- `src/main/java/com/civilizationmod/BuildingObservation.java`：新增 colony_id／binding reason 與 optional CodecTail 欄位。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：新增 Town Hall 半徑命令、Tab completion、inspect/list colony 顯示與 assign colony gate。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：只讓 colony-bound 建築執行居民導航。
+- `src/main/java/com/civilizationmod/BuildingLogisticsService.java`：只讓 colony-bound warehouse 執行入庫物流。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：只允許 colony-bound 有效建築進行居民綁定。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增半徑、殖民地綁定與未綁定原因英文。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：新增繁體中文半徑、殖民地綁定與未綁定原因。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：同步繁體中文 locale 政策。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增多核心不重疊、半徑更新拒絕重疊、跨維度並存、Town Hall binding status 與 BuildingObservation colony Codec 測試。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md` 與全域 Minecraft skill：同步可重用規則。
+
+### 查證與驗證
+
+- 版本：Minecraft 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Loom 1.17.19、Gradle 9.5.1、Java 25。
+- `gradlew.bat --no-daemon compileJava compileClientJava test --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon runDatagen --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon runFoodModelRegressionTest --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon build --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon runClient --console=plain`：已確認 Fabric、Minecraft 26.2、Civitas common initializer、Indigo、Render thread 與 client initialization 正常；完成 smoke 後停止 client。
+- JUnit：`CivitasCoreTest` 6 個案例通過，包含本次 Town Hall range／colony Codec 回歸。
+- 先前完整 build 曾因 legacy `BuildingObservation.status=bound` 的測試預期失敗；已修正為保留舊 status、僅以 colony_id 判定 `isColonyBound()`，之後回歸測試與完整 build 通過。
+
+### 未完成與風險
+
+本次尚未建立 GameTest 來自動生成實際 ItemFrame、Town Hall、住宅與 warehouse 世界；遊戲內仍需人工確認多核心範圍與 marker scan。既有舊世界若已保存互相重疊的 Town Hall 核心，會被 binding resolver 標記為重疊狀態，玩家需以半徑命令調整其中一座；本次不會自動刪除核心或搬移殖民地資料。半徑目前是軸對齊立方體，不是圓形半徑，尚未加入 UI slider 或資料包設定。
+
+### 下一步
+
+在遊戲內驗收 `/civitas townhall radius 1 128`、跨範圍多核心、範圍外建築未綁定，以及範圍內住宅／warehouse 顯示相同 colony_id。驗收通過後，建立第一版 `ResidentRecord`／ResidentRegistry，將居民身份從單純 building roster 抽離，並保存居民的 colony_id、住宅、工作建築與 body type。

@@ -68,10 +68,21 @@ public final class CivilizationCommands {
 					.then(scanCommand("sc"));
 		}
 
-		private static LiteralArgumentBuilder<CommandSourceStack> townHallCommand() {
-		return Commands.literal("townhall")
-				.executes(context -> townHallStatus(context.getSource()));
-	}
+        private static LiteralArgumentBuilder<CommandSourceStack> townHallCommand() {
+                return Commands.literal("townhall")
+                                .executes(context -> townHallStatus(context.getSource()))
+                                .then(Commands.literal("radius")
+                                                .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                                                .suggests(CivilizationCommands::suggestTownHallIndex)
+                                                                .then(Commands.argument(
+                                                                                "radius",
+                                                                                IntegerArgumentType.integer(1, TownHallCore.MAX_RADIUS))
+                                                                                .suggests(CivilizationCommands::suggestTownHallRadius)
+                                                                                .executes(context -> setTownHallRadius(
+                                                                                                context.getSource(),
+                                                                                                IntegerArgumentType.getInteger(context, "index"),
+                                                                                                IntegerArgumentType.getInteger(context, "radius"))))));
+        }
 
 	private static LiteralArgumentBuilder<CommandSourceStack> settlementCommand() {
 
@@ -200,17 +211,21 @@ public final class CivilizationCommands {
 				return 0;
 			}
 
-			for (TownHallCore core : data.getTownHallCores()) {
-				source.sendSuccess(() -> CivilizationMessages.translatable(
-						"civilizationmod.command.town_hall.entry",
-						core.colonyId(),
-						core.dimension(),
-						core.markerX(),
-						core.markerY(),
-						core.markerZ(),
-						core.createdAt(),
-						core.radius()), false);
-			}
+			                                for (int index = 1; index <= data.getTownHallCoreCount(); index++) {
+                                        final int coreIndex = index;
+                                        TownHallCore core = data.getTownHallCore(index);
+                                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                                        "civilizationmod.command.town_hall.entry",
+                                                        coreIndex,
+                                                        core.colonyId(),
+                                                        core.dimension(),
+                                                        core.markerX(),
+                                                        core.markerY(),
+                                                        core.markerZ(),
+                                                        core.createdAt(),
+                                                        core.radius()), false);
+                                }
+
 			return data.getTownHallCoreCount();
 		}
 
@@ -301,7 +316,33 @@ public final class CivilizationCommands {
 			};
 		}
 
-		private static int scanBuildings(CommandSourceStack source, int radius) {
+		        private static int setTownHallRadius(CommandSourceStack source, int index, int radius) {
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                CivilizationWorldData.TownHallRadiusUpdate update = data.updateTownHallRadius(index, radius);
+                switch (update.status()) {
+                        case UPDATED -> source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.town_hall.radius.updated",
+                                        index,
+                                        update.core().colonyId(),
+                                        update.core().radius()), false);
+                        case UNCHANGED -> source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.town_hall.radius.unchanged",
+                                        index,
+                                        update.core().radius()), false);
+                        case OVERLAPPING -> source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.town_hall.radius.overlapping",
+                                        index,
+                                        update.core().colonyId()), false);
+                        case INVALID -> source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.town_hall.radius.invalid",
+                                        index,
+                                        data.getTownHallCoreCount()), false);
+                }
+                return update.status() == CivilizationWorldData.TownHallRadiusUpdateStatus.UPDATED ? 1 : 0;
+        }
+
+        private static int scanBuildings(CommandSourceStack source, int radius) {
+
 			ServerLevel level = source.getLevel();
 			BlockPos origin = BlockPos.containing(source.getPosition());
 			CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
@@ -545,18 +586,22 @@ public final class CivilizationCommands {
                 return Component.translatable("civilizationmod.building.validation.reason.unknown");
 		}
 
-		private static Component buildingBinding(CivilizationWorldData data, BuildingObservation building) {
-			for (int index = 1; index <= data.getSettlementCount(); index++) {
-				SettlementAdapter settlement = data.getSettlement(index);
-				if (settlement.dimension().equals(building.settlementDimension())
-						&& settlement.centerX() == building.settlementX()
-						&& settlement.centerY() == building.settlementY()
-						&& settlement.centerZ() == building.settlementZ()) {
-					return Component.translatable("civilizationmod.building.binding.index", index);
-				}
-			}
-			return Component.translatable("civilizationmod.building.binding.unbound");
-		}
+		        private static Component buildingColonyBindingReason(BuildingObservation building) {
+                return Component.translatable(
+                        "civilizationmod.building.colony.reason." + building.colonyBindingReason());
+        }
+
+                private static Component buildingBinding(CivilizationWorldData data, BuildingObservation building) {
+                if (building.isColonyBound()) {
+                        return Component.translatable(
+                                        "civilizationmod.building.binding.colony",
+                                        building.colonyId());
+                }
+                return Component.translatable(
+                                "civilizationmod.building.binding.unbound_reason",
+                                buildingColonyBindingReason(building));
+        }
+
 
 		        private static int assignResident(CommandSourceStack source, int index, Entity explicitTarget)
                 throws CommandSyntaxException {
@@ -569,7 +614,7 @@ public final class CivilizationCommands {
                                 data.getBuildingCount()), false);
                         return 0;
                 }
-                if (!BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                                if (!BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
                         String currentValidationReason = building.validationReason();
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.building_not_valid",
@@ -577,8 +622,16 @@ public final class CivilizationCommands {
                                 buildingValidationReason(currentValidationReason)), false);
                         return 0;
                 }
+                if (!building.isColonyBound()) {
+                        Component bindingReason = buildingColonyBindingReason(building);
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.building_not_in_colony",
+                                bindingReason), false);
+                        return 0;
+                }
 
                 ServerLevel level = source.getLevel();
+
                 Villager villager;
                 if (explicitTarget != null) {
                         if (!(explicitTarget instanceof Villager candidate)) {
@@ -849,7 +902,29 @@ public final class CivilizationCommands {
 			return builder.buildFuture();
 		}
 
+		                private static CompletableFuture<Suggestions> suggestTownHallIndex(
+                                CommandContext<CommandSourceStack> context,
+                                SuggestionsBuilder builder
+                ) {
+                        CivilizationWorldData data = CivilizationWorldData.get(context.getSource().getServer());
+                        for (int index = 1; index <= data.getTownHallCoreCount(); index++) {
+                                builder.suggest(index);
+                        }
+                        return builder.buildFuture();
+                }
+
+                private static CompletableFuture<Suggestions> suggestTownHallRadius(
+                                CommandContext<CommandSourceStack> context,
+                                SuggestionsBuilder builder
+                ) {
+                        for (int radius : new int[]{32, 64, 96, 128, 256, 512}) {
+                                builder.suggest(radius);
+                        }
+                        return builder.buildFuture();
+                }
+
 		private static CompletableFuture<Suggestions> suggestSettlementIndex(
+
 			CommandContext<CommandSourceStack> context,
 			SuggestionsBuilder builder
 	) {

@@ -36,10 +36,19 @@ public record BuildingObservation(
         String residentUuid,
         String residentName,
         BuildingStorageSnapshot storageSnapshot,
-        List<ResidentAssignment> residents
+        List<ResidentAssignment> residents,
+        String colonyId,
+        String colonyBindingReason
 ) {
     public static final String STATUS_BOUND = "bound";
     public static final String STATUS_UNBOUND = "unbound";
+
+    public static final String COLONY_REASON_BOUND = "bound";
+    public static final String COLONY_REASON_NO_TOWN_HALL = "no_town_hall";
+    public static final String COLONY_REASON_OUTSIDE_TOWN_HALL = "outside_town_hall";
+    public static final String COLONY_REASON_OVERLAPPING_TOWN_HALL = "overlapping_town_hall";
+    public static final String COLONY_REASON_TOWN_HALL_CONFLICT = "town_hall_conflict";
+    public static final String COLONY_REASON_BUILDING_INVALID = "building_invalid";
 
     public static final String VALIDATION_DETECTED = "detected";
     public static final String VALIDATION_VALID = "valid";
@@ -102,7 +111,9 @@ public record BuildingObservation(
             int bedCount,
             String residentName,
             BuildingStorageSnapshot storageSnapshot,
-            List<ResidentAssignment> residents
+            List<ResidentAssignment> residents,
+            String colonyId,
+            String colonyBindingReason
     ) {
     }
 
@@ -113,7 +124,10 @@ public record BuildingObservation(
             BuildingStorageSnapshot.CODEC.optionalFieldOf("storage", BuildingStorageSnapshot.unscanned())
                     .forGetter(CodecTail::storageSnapshot),
             ResidentAssignment.CODEC.listOf().optionalFieldOf("residents", List.of())
-                    .forGetter(CodecTail::residents)
+                    .forGetter(CodecTail::residents),
+            Codec.STRING.optionalFieldOf("colony_id", "").forGetter(CodecTail::colonyId),
+            Codec.STRING.optionalFieldOf("colony_binding_reason", COLONY_REASON_NO_TOWN_HALL)
+                    .forGetter(CodecTail::colonyBindingReason)
     ).apply(instance, CodecTail::new));
 
     public static final Codec<BuildingObservation> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -137,7 +151,9 @@ public record BuildingObservation(
                     observation.bedCount(),
                     observation.residentName(),
                     observation.storageSnapshot(),
-                    observation.residents()))
+                    observation.residents(),
+                    observation.colonyId(),
+                    observation.colonyBindingReason()))
     ).apply(instance, (functionId, dimension, markerX, markerY, markerZ, status,
                        validationStatus, validationReason, firstSeen, lastSeen,
                        settlementDimension, settlementX, settlementY, settlementZ,
@@ -161,7 +177,9 @@ public record BuildingObservation(
             residentUuid,
             tail.residentName(),
             tail.storageSnapshot(),
-            tail.residents())));
+            tail.residents(),
+            tail.colonyId(),
+            tail.colonyBindingReason())));
 
     /** Backward-compatible constructor for observations created before geometry validation. */
     public BuildingObservation(
@@ -200,7 +218,9 @@ public record BuildingObservation(
                 "",
                 "",
                 BuildingStorageSnapshot.unscanned(),
-                List.of());
+                List.of(),
+                "",
+                COLONY_REASON_NO_TOWN_HALL);
     }
 
     public BuildingObservation(
@@ -237,7 +257,9 @@ public record BuildingObservation(
                 "",
                 "",
                 BuildingStorageSnapshot.unscanned(),
-                List.of());
+                List.of(),
+                "",
+                COLONY_REASON_NO_TOWN_HALL);
     }
 
     public BuildingObservation {
@@ -257,6 +279,10 @@ public record BuildingObservation(
         bedCount = Math.max(0, bedCount);
         residentUuid = residentUuid == null ? "" : residentUuid;
         residentName = residentName == null ? "" : residentName;
+        colonyId = colonyId == null ? "" : colonyId;
+        colonyBindingReason = colonyBindingReason == null || colonyBindingReason.isBlank()
+                ? COLONY_REASON_NO_TOWN_HALL
+                : colonyBindingReason;
         storageSnapshot = storageSnapshot == null
                 ? BuildingStorageSnapshot.unscanned()
                 : storageSnapshot;
@@ -265,6 +291,36 @@ public record BuildingObservation(
             residentUuid = residents.get(0).uuid();
             residentName = residents.get(0).name();
         }
+    }
+
+    public boolean isColonyBound() {
+        return STATUS_BOUND.equals(status) && !colonyId.isBlank();
+    }
+
+    public BuildingObservation withColonyBinding(String newStatus, String newColonyId, String newReason) {
+        return new BuildingObservation(
+                this.functionId,
+                this.dimension,
+                this.markerX,
+                this.markerY,
+                this.markerZ,
+                newStatus,
+                this.validationStatus,
+                this.validationReason,
+                this.firstSeen,
+                this.lastSeen,
+                this.settlementDimension,
+                this.settlementX,
+                this.settlementY,
+                this.settlementZ,
+                this.capacity,
+                this.bedCount,
+                this.residentUuid,
+                this.residentName,
+                this.storageSnapshot,
+                this.residents,
+                newColonyId,
+                newReason);
     }
 
     public boolean isSameMarker(String otherDimension, int x, int y, int z) {
@@ -358,7 +414,9 @@ public record BuildingObservation(
                 this.residentUuid,
                 this.residentName,
                 newStorageSnapshot,
-                this.residents);
+                this.residents,
+                this.colonyId,
+                this.colonyBindingReason);
     }
 
     public boolean hasResident() {
@@ -427,7 +485,9 @@ public record BuildingObservation(
                 this.residentUuid,
                 this.residentName,
                 this.storageSnapshot,
-                this.residents);
+                this.residents,
+                this.colonyId,
+                this.colonyBindingReason);
     }
 
     public BuildingObservation withResidenceMeasurements(int newCapacity, int newBedCount) {
@@ -451,7 +511,9 @@ public record BuildingObservation(
                 this.residentUuid,
                 this.residentName,
                 this.storageSnapshot,
-                this.residents);
+                this.residents,
+                this.colonyId,
+                this.colonyBindingReason);
     }
 
     private BuildingObservation withResidents(List<ResidentAssignment> updatedResidents) {
@@ -481,7 +543,9 @@ public record BuildingObservation(
                 primaryUuid,
                 primaryName,
                 this.storageSnapshot,
-                updatedResidents == null ? List.of() : updatedResidents);
+                updatedResidents == null ? List.of() : updatedResidents,
+                this.colonyId,
+                this.colonyBindingReason);
     }
 
     public BuildingObservation withoutResident() {
@@ -522,7 +586,9 @@ public record BuildingObservation(
                 this.residentUuid,
                 this.residentName,
                 snapshot,
-                this.residents);
+                this.residents,
+                this.colonyId,
+                this.colonyBindingReason);
     }
 
     private static List<ResidentAssignment> normalizeResidents(
