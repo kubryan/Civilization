@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "i": "minecraft:iron_ingot",
+    "s": "minecraft:stick"
+  },
+  "pattern": [
+    "sss",
+    "sis",
+    "sss"
+  ],
+  "result": {
+    "id": "civilizationmod:residence_binding_device"
+  }
+}

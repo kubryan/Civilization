@@ -468,3 +468,10 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 採用規則：每次新增 item 都要同時檢查 registry id、`items/<id>.json`、`models/item/<id>.json` 與 `textures/item/<id>.png`，並在 `processResources` 或 `build` 後確認四者均進入 `build/resources/main`。不要只以 PNG 存在或 texture atlas 載入成功判斷 item model 完整。
 
 查證：專案既有正常 marker 的 26.2 item definition、`gradlew.bat --no-daemon processResources --console=plain` 與 `build/resources/main` 檔案檢查；日期 2026-08-21。
+
+
+## 已查證：住宅綁定裝置 shaped recipe 材料（2026-08-21）
+
+本次使用實際 Minecraft 26.2 common jar 的 `javap` 確認 `net.minecraft.world.item.Items` 公開 `public static final Item STICK`。住宅綁定裝置配方採用既有 `FabricRecipeProvider`／`RecipeProvider.shaped(...)` 流程：pattern `sss`、`sis`、`sss`，`s = Items.STICK`、`i = Items.IRON_INGOT`，以 `has(Items.STICK)` 作為解鎖條件，輸出 `CivilizationItems.RESIDENCE_BINDING_DEVICE`。配方是 3×3 有序合成，不是 shapeless。
+
+查證：`C:\Program Files\Java\jdk-25.0.2\bin\javap.exe` 對 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `net.minecraft.world.item.Items` 輸出；日期 2026-08-21。

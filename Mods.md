@@ -3332,3 +3332,46 @@ building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已
 
 - [1] 專案既有正常資源：`assets/civilizationmod/items/warehouse_marker.json` 與 `assets/civilizationmod/items/residential_marker_1.json`。
 - [2] Minecraft 26.2 實際 `build/resources/main` 與 `build/libs/civilizationmod-1.0.0.jar` 資源封裝檢查，日期 2026-08-21。
+
+
+## 2026-08-21 — 新增住宅綁定裝置正式合成配方
+
+### 變更
+
+玩家確認住宅綁定裝置採用 3×3 有序合成配方：外圈 8 個原版木棍，中央 1 個鐵錠，輸出 1 個 `civilizationmod:residence_binding_device`。本次將配方加入既有 `CivilizationModRecipeProvider`，沒有建立平行 datagen provider，也沒有修改住宅綁定裝置的互動、保存資料或物品材質。
+
+配方解鎖條件設定為玩家取得木棍後解鎖，生成的 advancement 使用 `has_stick` criterion。此設計符合配方主要材料為木棍的基本遊戲流程，也保留中央鐵錠作為裝置的金屬核心成本。
+
+### 影響檔案
+
+- `src/client/java/com/civilizationmod/client/CivilizationModRecipeProvider.java`：新增 `RESIDENCE_BINDING_DEVICE` 的 shaped recipe，pattern 為 `sss`、`sis`、`sss`，`s = Items.STICK`、`i = Items.IRON_INGOT`。
+- `src/main/generated/data/civilizationmod/recipe/residence_binding_device.json`：datagen 產生的正式 recipe JSON。
+- `src/main/generated/data/civilizationmod/advancement/recipes/misc/residence_binding_device.json`：datagen 產生的配方解鎖 advancement。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 `Items.STICK` 與 shaped recipe 查證。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步追加配方查證規則。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域 skill 規則。
+- `Mods.md`：追加本次配方與驗證歷史。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- API 查證：以 `C:\Program Files\Java\jdk-25.0.2\bin\javap.exe` 查詢 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 `net.minecraft.world.item.Items`，確認 `public static final Item STICK` 存在。
+- 命令：`gradlew.bat --no-daemon runDatagen --console=plain`；結果：`BUILD SUCCESSFUL`，生成 recipe 與 advancement。
+- 生成 recipe 檢查：確認 pattern 為 `sss`、`sis`、`sss`，key 為 `minecraft:stick` 與 `minecraft:iron_ingot`，result 為 `civilizationmod:residence_binding_device`。
+- 生成 advancement 檢查：確認使用 `has_stick`，recipe unlock 指向 `civilizationmod:residence_binding_device`。
+- 命令：`gradlew.bat --no-daemon compileJava compileClientJava build runFoodModelRegressionTest --console=plain`；結果：`BUILD SUCCESSFUL`，`FoodModelRegressionTest: PASS`。
+- jar 檢查：`build/libs/civilizationmod-1.0.0.jar` 包含住宅綁定裝置的 item definition、model、texture、recipe 與 advancement。
+- `git diff --check`：通過；datagen 的 tracked cache 雜訊已還原，未納入本次功能提交。
+
+### 未完成與風險
+
+本次已完成檔案與建置驗證，尚未由玩家在遊戲內用工作台實際放入 8 個木棍與中央鐵錠確認合成結果與配方書解鎖顯示。若遊戲內配方書沒有立即更新，請先重新進入世界或使用 `F3 + T` 重新載入資源；配方本身已封裝於正式 jar。
+
+### 下一步
+
+在遊戲內以工作台驗收住宅綁定裝置配方，確認 8 木棍加中央鐵錠可合成 1 個裝置，並確認木棍取得後配方能解鎖。驗收成功後可進入住宅綁定裝置的完整兩步綁定流程，接著再規劃市政廳 marker。
+
+### 來源
+
+- [1] 本機 Minecraft 26.2 common jar 的 `net.minecraft.world.item.Items` javap 查證，日期 2026-08-21。
+- [2] Fabric 26.2 配方生成文件：https://docs.fabricmc.net/develop/data-generation/recipes。

@@ -369,3 +369,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：新增 item 時必須同時檢查 registry id、`items/<id>.json`、`models/item/<id>.json` 與 `textures/item/<id>.png`，並在 `processResources`／`build` 後確認四者進入 `build/resources/main`。
 - 禁止：不要只以 PNG 存在、`models/item` 存在或 texture atlas 載入成功宣稱 item icon 資源完整。
 - 查證：專案既有 `warehouse_marker.json`、`residential_marker_1.json`、`processResources` 成功輸出與 `build/resources/main` 檔案檢查；日期 2026-08-21。
+
+
+## 2026-08-21 — 住宅綁定裝置配方材料查證
+
+- 任務：新增住宅綁定裝置的 3×3 有序合成配方。
+- 已確認：Minecraft 26.2 common jar 的 `net.minecraft.world.item.Items` 公開 `public static final Item STICK`；既有 `CivilizationModRecipeProvider` 使用 `FabricRecipeProvider` 與 `RecipeProvider.shaped(...)`。
+- 採用：配方 pattern 為 `sss`、`sis`、`sss`，`s = Items.STICK`、`i = Items.IRON_INGOT`，輸出 `CivilizationItems.RESIDENCE_BINDING_DEVICE`，解鎖條件為 `has(Items.STICK)`。
+- 禁止：不要將本配方改成 shapeless；不要把木棍寫成猜測的字串或自行建立新材料物品。
+- 查證：本機 Minecraft 26.2 common jar 的 `javap`、既有 recipe provider；日期 2026-08-21。

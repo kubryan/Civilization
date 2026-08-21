@@ -38,6 +38,15 @@ public final class CivilizationModRecipeProvider extends FabricRecipeProvider {
                         .unlockedBy(getHasName(Items.CHEST), has(Items.CHEST))
                         .save(output);
 
+                    shaped(RecipeCategory.MISC, CivilizationItems.RESIDENCE_BINDING_DEVICE)
+                        .pattern("sss")
+                        .pattern("sis")
+                        .pattern("sss")
+                        .define('s', Items.STICK)
+                        .define('i', Items.IRON_INGOT)
+                        .unlockedBy(getHasName(Items.STICK), has(Items.STICK))
+                        .save(output);
+
                     shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_1)
                         .pattern("www")
                         .pattern("wiw")
