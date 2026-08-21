@@ -23,6 +23,8 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 有效的住宅與 warehouse 只有在唯一 Town Hall 範圍內時，才會獲得 `colony_id` 並成為 colony-bound 建築。為了避免舊世界在尚未建立市政廳時突然停止運作，若該維度完全沒有 Town Hall，**有效但未綁定的建築會以過渡模式繼續執行居民導航、warehouse 物流、居民指派與通用綁定裝置功能**；建築列表與 assign／綁定成功訊息會明確顯示過渡模式。當該維度建立 Town Hall 後，規則立即恢復嚴格模式：範圍外與重疊範圍的建築仍不可 assign、不可物流、不可使用綁定裝置，也不會取得 `colony_id`。不同維度各自判定，因此某維度沒有市政廳不會放寬另一個已有市政廳維度的範圍限制。
 
+兩個同維度 Town Hall 的重疊判定是三軸距離分別小於或等於兩個範圍半徑的總和。也就是說，兩個核心若剛好只差 `radiusA + radiusB` 格，立方範圍會剛好貼邊，仍被視為衝突而不能同時註冊；要完全不相交，核心至少要再多間隔一格。這是刻意的防衝突規則，避免兩座殖民地對邊界格建築產生不確定歸屬。邊界格本身仍屬於其唯一 Town Hall；若兩座核心因貼邊或相交而造成多重包含，該建築會被標記為 `overlapping_town_hall` 並停止殖民地功能。
+
 ### Warehouse 倉庫與物流
 
 玩家可以使用 `warehouse_marker` 宣告倉庫。玩家先用 marker 左鍵選取 territory 的 A 點，再以右鍵選取 B 點；完成的 territory 會保存於 ItemStack 的 CustomData。接著把 marker 放入領地內、附著於牆面的 ItemFrame，再執行建築掃描。

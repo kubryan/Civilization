@@ -4355,3 +4355,48 @@ gradlew.bat --no-daemon build --console=plain
 ### 下一步
 
 啟動 client 後執行 `/civitas townhall`，確認訊息包含「軸對齊立方範圍」與「不是圓形」；執行 `/civitas townhall radius 1 128`，確認更新訊息使用相同術語；最後執行 `/civitas help`，確認 Town Hall 說明指出這是 axis-aligned cube range 而非 circular radius。
+
+
+## 2026-08-21 — Town Hall 貼邊重疊與邊界格驗收規則
+
+### 結論
+
+本次確認目前重疊邏輯符合刻意的防衝突設計：同維度兩個 Town Hall 以三軸距離分別比較，任一軸距離小於或等於兩個範圍半徑總和時，`TownHallCore.overlaps(...)` 回傳 true。距離剛好等於半徑總和代表兩個軸對齊立方範圍剛好貼邊，因此也會被視為重疊衝突；要完全不相交，至少一個軸必須再多間隔一格。
+
+單一核心的 `contains(...)` 仍使用三軸各自 `<= radius`。因此唯一 Town Hall 的邊界格屬於該核心；若貼邊／相交核心同時涵蓋某個 marker，binding resolver 會回傳 `OVERLAPPING`，建築不會取得 colony_id，也不能執行 colony 功能。這可避免邊界建築同時屬於兩個殖民地。
+
+### 修改內容
+
+三份 locale 的重疊、Town Hall duplicate 與 colony binding reason 已明確使用「相交或剛好貼邊」文字。README 補充半徑總和、貼邊仍衝突、完全不相交需多一格，以及唯一核心邊界格可正常歸屬的說明。兩份專案 skill 同步追加 `<=` 邊界規則與禁止改成 `<`／圓形距離的限制。
+
+`CivitasCoreTest` 新增以下回歸案例：核心距離 `radiusA + radiusB + 1` 時不重疊；距離 `radiusA + radiusB` 時貼邊並重疊；唯一核心邊界格仍被 `contains` 與 Town Hall binding 視為有效；貼邊核心的第二個註冊會回傳 duplicate。
+
+### 影響檔案
+
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增 Town Hall 不相交、貼邊、邊界格與 duplicate regression。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：英文重疊／貼邊訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：繁體中文重疊／貼邊訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文重疊／貼邊訊息。
+- `README.md`：補充重疊公式與玩家驗收語義。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加可重用 boundary 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步 boundary 規則。
+- `Mods.md`：追加本次結論與驗證。
+
+### 查證與驗證
+
+本次使用現有 common-side `TownHallCore.overlaps`／`contains` 實作與 `CivilizationWorldData.registerTownHall`／`findTownHallBinding` 行為，沒有新增版本敏感 Fabric API，也沒有修改 SavedData 欄位或 schema。
+
+```text
+gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain
+gradlew.bat --no-daemon build --console=plain
+```
+
+兩次均為 `BUILD SUCCESSFUL`，並通過 `FoodModelRegressionTest: PASS`。新增 Town Hall boundary regression 通過，完整 build 的 common／client 編譯、locale 資源處理、JUnit、check、jar、sourcesJar 與 assemble 均通過。
+
+### 尚待遊戲內驗收
+
+尚未在遊戲內人工建立三組幾何案例。必須分別測試：兩核心距離大於半徑總和一格時可並存；距離剛好等於半徑總和時第二核心被拒絕並顯示「相交或剛好貼邊」；唯一核心的 marker 放在 `core + radius` 邊界格時仍可取得該核心 colony binding。最後再用貼邊／衝突核心的建築 marker 確認它不會被錯誤 assign。
+
+### 下一步
+
+啟動 client 後以預設半徑 64 建立核心，沿同一軸分別在 129 格與 128 格放置第二個 Town Hall marker，執行 `building scan` 比較不相交與貼邊結果；再在核心各軸正方向第 64 格放置有效建築 marker，確認邊界格屬於唯一核心。

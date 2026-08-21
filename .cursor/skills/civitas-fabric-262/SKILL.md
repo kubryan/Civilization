@@ -570,3 +570,13 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 - 測試：Town Hall regression 必須確認三軸各自的邊界可包含、任一軸超出一格即不包含；角落可包含不代表使用球形距離。
 - 禁止：不要為了文案重命名已保存的 `radius` 欄位，不要把 `contains` 改成平方距離或水平圓形判定。
 - 查證：目前 `TownHallCore.contains` 實作與 `CivitasCoreTest` 立方邊界回歸；日期 2026-08-21。
+
+
+## 2026-08-21 — Town Hall 貼邊也視為重疊衝突
+
+- 任務：明確化多 Town Hall 的不相交、貼邊與邊界格行為。
+- 已確認：`TownHallCore.overlaps(other)` 對同維度核心使用三軸距離分別 `<= radiusA + radiusB`；距離剛好等於半徑總和時，兩個軸對齊立方範圍貼邊，仍回傳 overlap。`TownHallCore.contains(position)` 對每一軸使用 `<= radius`，因此唯一核心的邊界格仍包含在該核心範圍內。
+- 採用：兩核心要完全不相交，至少一個軸的核心距離必須大於半徑總和；同維度貼邊註冊回傳 duplicate／conflict，避免邊界建築產生不確定 colony ownership。建築若同時被多個核心包含，binding status 為 `OVERLAPPING`，不可取得 colony_id。
+- 驗收：至少測試核心距離 `radiusA + radiusB + 1`（不相交）、`radiusA + radiusB`（貼邊衝突）、唯一核心邊界格（可綁定）；也要測試貼邊／相交時的建築 marker binding。
+- 禁止：不要把 overlaps 的 `<=` 擅自改成 `<`，不要把建築邊界判定改成圓形距離，也不要讓貼邊核心自動共用邊界建築。
+- 查證：`TownHallCore.java` 與 `CivitasCoreTest.java` 的 common-side 回歸；日期 2026-08-21。

@@ -430,6 +430,23 @@ class CivitasCoreTest {
                 "minecraft:overworld", firstMarker.offset(180, 0, 0), 2000L).status());
         assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED, data.registerTownHall(
                 "minecraft:the_nether", firstMarker, 2222L).status());
+
+        TownHallCore separatedA = TownHallCore.create("minecraft:overworld", new BlockPos(0, 64, 0), 1L);
+        TownHallCore separatedB = TownHallCore.create("minecraft:overworld", new BlockPos(129, 64, 0), 2L);
+        TownHallCore touching = TownHallCore.create("minecraft:overworld", new BlockPos(128, 64, 0), 3L);
+        assertFalse(separatedA.overlaps(separatedB));
+        assertTrue(separatedA.overlaps(touching));
+        assertTrue(separatedA.contains(new BlockPos(64, 64, 64)));
+        assertFalse(separatedA.contains(new BlockPos(65, 64, 64)));
+        assertTrue(touching.contains(new BlockPos(64, 64, 0)));
+
+        CivilizationWorldData touchingData = new CivilizationWorldData();
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED,
+                touchingData.registerTownHall("minecraft:overworld", new BlockPos(0, 64, 0), 1L).status());
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.DUPLICATE,
+                touchingData.registerTownHall("minecraft:overworld", new BlockPos(128, 64, 0), 2L).status());
+        assertSame(CivilizationWorldData.TownHallBindingStatus.BOUND,
+                touchingData.findTownHallBinding("minecraft:overworld", new BlockPos(64, 64, 0)).status());
         assertEquals(3, data.getTownHallCoreCount());
         assertSame(CivilizationWorldData.TownHallBindingStatus.BOUND,
                 data.findTownHallBinding("minecraft:overworld", firstMarker.offset(20, 0, 0)).status());
