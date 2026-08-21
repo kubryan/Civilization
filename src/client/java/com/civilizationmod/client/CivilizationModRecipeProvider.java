@@ -47,6 +47,17 @@ public final class CivilizationModRecipeProvider extends FabricRecipeProvider {
                         .unlockedBy(getHasName(Items.STICK), has(Items.STICK))
                         .save(output);
 
+                    shaped(RecipeCategory.MISC, CivilizationItems.TOWN_HALL_MARKER)
+                        .pattern("esp")
+                        .pattern("ah ")
+                        .define('e', Items.EMERALD)
+                        .define('s', Items.IRON_SWORD)
+                        .define('p', Items.IRON_PICKAXE)
+                        .define('a', Items.IRON_AXE)
+                        .define('h', Items.IRON_SHOVEL)
+                        .unlockedBy(getHasName(Items.EMERALD), has(Items.EMERALD))
+                        .save(output);
+
                     shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_1)
                         .pattern("www")
                         .pattern("wiw")

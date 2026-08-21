@@ -380,6 +380,15 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 查證：本機 Minecraft 26.2 common jar 的 `javap`、既有 recipe provider；日期 2026-08-21。
 
 
+## 2026-08-21 — 市政廳 marker 有序合成配方材料查證
+
+- 任務：依使用者指定新增市政廳 marker 的 3×2 有序合成配方。
+- 已確認：Minecraft 26.2 common jar 的 `net.minecraft.world.item.Items` 公開 `EMERALD`、`IRON_SWORD`、`IRON_PICKAXE`、`IRON_AXE` 與 `IRON_SHOVEL`；Fabric 官方 Recipe Generation 26.2 文件確認 `pattern`、`define`、`unlockedBy` 與 `save(output)` 的 datagen 流程。
+- 採用：pattern 為 `esp`、`ah `；第一列依序是綠寶石、鐵劍、鐵鎬，第二列依序是鐵斧、鐵鏟並靠左排列，第三格為空白。Minecraft 26.2 的 `ShapedRecipeBuilder.pattern(...)` 要求每列寬度相同，不能直接使用兩字元的 `ah`；輸出 `CivilizationItems.TOWN_HALL_MARKER`，以綠寶石作為 recipe advancement unlock。
+- 禁止：不要把此配方改成 shapeless；不要用字串 ID 取代已查證的 `Items` 常數，也不要手寫 generated JSON 取代 recipe provider。
+- 查證：[Fabric Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes)、本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 JDK 25 `javap`；日期 2026-08-21。
+
+
 ## 2026-08-21 — 市政廳 marker 視覺 prototype 與功能分層
 
 - 任務：建立市政廳 marker 的方塊式 item model 與獨立材質。

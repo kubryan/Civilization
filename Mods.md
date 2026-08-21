@@ -3631,3 +3631,69 @@ Town Hall 目前可以被通用裝置選取，但 territory 快速部署刻意�
 ### 下一步
 
 請在遊戲內先使用 `/give @p civilizationmod:civitas_binding_device`，分別對有效 warehouse 與 residence marker 蹲下右鍵選取，再右鍵村民確認綁定；另以 `/give @p civilizationmod:residence_binding_device` 驗證 legacy 物品仍然可用。接著手持已完成 territory 的 warehouse 或 residence marker，對視線中的空 ItemFrame 蹲下右鍵空氣，確認 marker 被消耗並轉移到 ItemFrame。市政廳則以 `/civitas building scan` 與 `/civitas townhall` 驗證核心登記後，進入「市政廳殖民地歸屬切片」。
+
+
+## 2026-08-21 — 市政廳 marker 有序合成配方
+
+### 變更
+
+依照使用者指定，市政廳 marker 現在使用五件原版材料的有序合成：第一列為綠寶石、鐵劍、鐵鎬；第二列為鐵斧、鐵鏟。配方輸出 `civilizationmod:town_hall_marker`，解鎖 advancement 以玩家持有綠寶石為條件。
+
+使用者提供的第二列只有兩個材料，但 Minecraft 26.2 的 `ShapedRecipeBuilder.pattern(...)` 要求每一列寬度相同，因此實作 pattern 為 `esp` 與 `ah `，第二列最右格為空白，材料仍然是左對齊的兩格，不會增加額外材料。這是保持使用者指定排列同時符合 26.2 recipe builder 驗證的必要表示方式。
+
+### 配方排列
+
+| 合成格 | 材料 |
+|---|---|
+| 第一列第一格 | 綠寶石 `minecraft:emerald` |
+| 第一列第二格 | 鐵劍 `minecraft:iron_sword` |
+| 第一列第三格 | 鐵鎬 `minecraft:iron_pickaxe` |
+| 第二列第一格 | 鐵斧 `minecraft:iron_axe` |
+| 第二列第二格 | 鐵鏟 `minecraft:iron_shovel` |
+| 第二列第三格 | 空白 |
+
+### API 查證
+
+Fabric 官方 [Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes) 確認此專案使用的 client-side `FabricRecipeProvider`、內部 `RecipeProvider.buildRecipes()`、`shaped(...)`、`pattern(...)`、`define(...)`、`unlockedBy(...)` 與 `save(output)` datagen 流程。本機 Minecraft 26.2 common jar 以 JDK 25 `javap` 確認 `Items.EMERALD`、`Items.IRON_SWORD`、`Items.IRON_PICKAXE`、`Items.IRON_AXE` 與 `Items.IRON_SHOVEL` 均為公開 `Item` 常數，沒有猜測版本 API。
+
+### 影響檔案
+
+- `src/client/java/com/civilizationmod/client/CivilizationModRecipeProvider.java`：加入市政廳 marker 的 shaped recipe；第二列使用等寬 pattern `ah `。
+- `src/main/generated/data/civilizationmod/recipe/town_hall_marker.json`：datagen 生成的正式 recipe JSON。
+- `src/main/generated/data/civilizationmod/advancement/recipes/misc/town_hall_marker.json`：配方解鎖 advancement，條件為持有綠寶石。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 Item 常數、官方 recipe 流程與 shaped pattern 等寬規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步相同查證結果。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域可重用規則。
+- `Mods.md`：追加本次 recipe 變更、錯誤診斷、驗證結果與下一步。
+
+### 查證與驗證
+
+| 命令／項目 | 結果 |
+|---|---|
+| Minecraft 26.2 common jar `javap` | 確認五個 `Items` 常數存在；JDK 路徑為 `C:\Program Files\Java\jdk-25.0.2\bin\javap.exe`，common jar 為 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`。 |
+| 第一次 `gradlew.bat --no-daemon runDatagen --console=plain` | 失敗，完整 log 確認原因是 `Pattern must be the same width on every line!`，定位至市政廳 recipe 的第二列 `ah`。不是 Item registry 或 client/server 邊界錯誤。 |
+| 修正後 `gradlew.bat --no-daemon runDatagen --console=plain` | `BUILD SUCCESSFUL`；provider 完成，寫入 14 個 datagen 檔案，recipe 與 advancement 均生成。 |
+| 生成 recipe JSON 檢查 | pattern 為 `esp`、`ah `；key 正確對應 emerald、iron sword、iron pickaxe、iron axe、iron shovel；result 為 `civilizationmod:town_hall_marker`。 |
+| 生成 advancement JSON 檢查 | `has_emerald` 條件與 `civilizationmod:town_hall_marker` recipe unlock 正確。 |
+| `gradlew.bat --no-daemon runFoodModelRegressionTest compileJava compileClientJava build --console=plain` | `FoodModelRegressionTest: PASS`；`BUILD SUCCESSFUL`。 |
+
+### 未完成與風險
+
+本次尚未在遊戲內打開合成台人工確認 recipe book 圖示與實際合成動畫；datagen、JSON、common/client compile 與完整 build 已通過。第二列右側空白是 shaped recipe 的必要空位，若未來希望第二列置中或改成三格排列，需另行修改 pattern 並重新驗證，不應直接刪除空白以免再次觸發 26.2 等寬錯誤。
+
+### 下一步
+
+請在遊戲內重新載入資源或重啟 client，在合成台依照下列排列測試：
+
+```text
+[綠寶石][鐵劍][鐵鎬]
+[鐵斧  ][鐵鏟][空白  ]
+```
+
+確認能合成 `town_hall_marker` 後，繼續市政廳殖民地歸屬切片：將有效 warehouse／residence 綁定到同維度、Town Hall 半徑 64 內的 `colony_id`。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/data-generation/recipes — Fabric Recipe Generation 26.2。
+- [2] https://docs.fabricmc.net/develop/data-generation/setup — Fabric Data Generation Setup 26.2。
+- [3] 本機 Minecraft 26.2 common jar `javap`：`Items` Item 常數與實際 datagen stacktrace，查證日期 2026-08-21。

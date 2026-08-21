@@ -533,3 +533,12 @@ Minecraft 26.2 common jar 的 javap 確認 `ItemStack.remove(DataComponentType<?
 Fabric API 0.158.0+26.2 jar javap 確認 `UseItemCallback.EVENT` 與 `interact(Player, Level, InteractionHand)`。直接右鍵空 ItemFrame 繼續由 `UseEntityCallback` 處理；蹲下右鍵空氣新增 `UseItemCallback`，以 16 格 AABB、視線 dot 門檻 0.92、`Player.hasLineOfSight` 與最近距離選取空 ItemFrame，再共用 server-side dimension、territory、牆面附著、重複 marker、CustomData copy 與背包 fallback 驗證。快速部署接受 warehouse／residence territory marker，排除 Town Hall；未完成 territory 只回傳 localized incomplete message，不修改 ItemFrame。
 
 查證來源：Fabric Events 26.2 https://docs.fabricmc.net/develop/events、Custom Item Interactions 26.2 https://docs.fabricmc.net/develop/items/custom-item-interactions、本機 Fabric API 0.158.0+26.2 jar javap、專案 `BuildingResidentService.findLookedAtVillager`；日期 2026-08-21。
+
+
+## 已查證：市政廳 marker 有序合成配方（2026-08-21）
+
+Fabric 官方 [Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes) 確認 shaped recipe 使用 `pattern(String)`、`define(char, Item/Tag)`、`unlockedBy(...)` 與 `save(output)`；本機 Minecraft 26.2 common jar 的 javap 確認 `Items.EMERALD`、`Items.IRON_SWORD`、`Items.IRON_PICKAXE`、`Items.IRON_AXE` 與 `Items.IRON_SHOVEL` 都是公開 Item 常數。
+
+市政廳 marker 採 3×2 shaped recipe：第一列 `esp` 代表綠寶石、鐵劍、鐵鎬；第二列使用 `ah `（第三格為空白）代表鐵斧、鐵鏟並靠左排列。Minecraft 26.2 的 `ShapedRecipeBuilder.pattern(...)` 要求每列寬度相同，不能直接使用兩字元的 `ah`。配方輸出 `CivilizationItems.TOWN_HALL_MARKER`，以持有綠寶石作為 advancement unlock 條件。正式 JSON 必須由 `runDatagen` 生成，不手寫與 provider 不一致的副本。
+
+查證日期：2026-08-21；查證方式：Fabric 官方 recipe generation 文件與本機 Minecraft 26.2 common jar `javap`。

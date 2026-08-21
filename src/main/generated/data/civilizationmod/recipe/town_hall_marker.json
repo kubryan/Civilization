@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "a": "minecraft:iron_axe",
+    "e": "minecraft:emerald",
+    "h": "minecraft:iron_shovel",
+    "p": "minecraft:iron_pickaxe",
+    "s": "minecraft:iron_sword"
+  },
+  "pattern": [
+    "esp",
+    "ah "
+  ],
+  "result": {
+    "id": "civilizationmod:town_hall_marker"
+  }
+}
