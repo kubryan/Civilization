@@ -100,13 +100,13 @@ Minecraft 26.2 自訂 item 依官方文件使用 `ResourceKey<Item>`、`Registri
 26.2 `DataComponents.CUSTOM_DATA` 型別為 `DataComponentType<CustomData>`；`CustomData.of(CompoundTag)`、`CustomData.set(...)`、`CustomData.copyTag()` 與 `CompoundTag.putInt`、`getIntOr`、`putString`、`getStringOr`、`contains`、`remove` 已由 common jar 查證。warehouse_marker 可用此 component 保存版本化的 point A 或正規化後 `min_x/min_y/min_z/max_x/max_y/max_z` warehouse territory。building scan 不再猜最近的門；只要領地內有附著合法的 ItemFrame 且展示對應、帶同一領地資料的 warehouse_marker，就能啟用 warehouse。門、floor、roof、walls 與 entry 改為非阻斷性的診斷資訊，除非未來另行恢復品質門檻。
 
 
-## Warehouse Marker tooltip、快速部署與 duplicate（2026-08-20）
+## Warehouse Marker tooltip、直接部署與 duplicate（2026-08-20）
 
 `warehouse_marker` 的 tooltip 使用 Minecraft 26.2 common jar 已查證的 `Item.appendHoverText(ItemStack, Item.TooltipContext, TooltipDisplay, Consumer<Component>, TooltipFlag)`，只讀 ItemStack CustomData，不在 tooltip 中改動 server state。已完成 Marker 顯示原始 point A、point B 與 warehouse territory configured/unconfigured；pending marker 顯示 point B 待確認。為了讓 tooltip 與玩家實際點擊一致，CustomData 同時保存原始 A/B 與正規化 min/max bounds；驗證與領地搜尋使用 min/max，顯示使用原始 A/B。
 
-蹲下右鍵空 ItemFrame 的快速部署使用 Fabric 26.2 官方 `UseEntityCallback`。官方 Javadoc（https://maven.fabricmc.net/docs/fabric-api-0.158.0+26.2/net/fabricmc/fabric/api/event/player/UseEntityCallback.html）確認 logical client 回傳 `SUCCESS` 會取消原版流程、揮手並送 server packet；logical server 回傳非 `PASS` 會取消原版流程。因此符合條件時 client/server 都回傳 `SUCCESS`；server 必須檢查主手、蹲下、非 spectator、ItemFrame 為空、Marker territory 完整、維度一致、frame 在 territory 內、frame 有支撐牆，才將 `handStack.copyWithCount(1)` 寫入 frame、`handStack.shrink(1)` 消耗手上 Marker、套用 glint，並回傳成功。轉移必須使用同一份帶 CustomData 的 stack copy，不得重建只含 item identity 的新 Marker；玩家拆下 ItemFrame 後應取得相同 territory 資料。
+直接蹲下右鍵空 ItemFrame 的部署使用已查證的 Fabric 26.2 `UseEntityCallback`。server 必須檢查主手、蹲下、非 spectator、ItemFrame 為空、Marker territory 完整、維度一致、frame 在 territory 內、frame 有支撐牆，才將 `handStack.copyWithCount(1)` 寫入 frame、`handStack.shrink(1)` 消耗手上 Marker、套用 glint，並回傳成功。轉移必須使用同一份帶 CustomData 的 stack copy，不得重建只含 item identity 的新 Marker；玩家拆下 ItemFrame 後應取得相同 territory 資料。
 
-快速部署失敗時不可消耗手上 Marker。非蹲下、非主手、非空 ItemFrame 或非 warehouse_marker 互動應回傳 `PASS`，讓 vanilla 行為繼續；蹲下但 server 驗證失敗時回傳 `FAIL`，避免 vanilla 將 Marker 放入錯誤位置。ItemFrame entity callback 要自行檢查 spectator，因官方 callback 在 spectator check 前觸發。
+直接 ItemFrame 部署失敗時不可消耗手上 Marker。非蹲下、非主手、非空 ItemFrame 或非 territory marker 互動應回傳 `PASS`，讓 vanilla 行為繼續；蹲下但 server 驗證失敗時回傳 `FAIL`，避免 vanilla 將 Marker 放入錯誤位置。ItemFrame entity callback 要自行檢查 spectator，因官方 callback 在 spectator check 前觸發。已撤回蹲下右鍵空氣後以視線尋找 ItemFrame 的 `UseItemCallback` 路徑，不得重新加入。
 
 同一個完整 `WarehouseTerritory` record（維度與 bounds 相同）只允許第一個有效 ItemFrame 啟用；building scan 中以 `HashSet<WarehouseTerritory>` 按候選順序保留第一個 valid，後續相同領地建立 observation 但標為 `invalid`、reason=`duplicate_territory` 並移除其 glint。這是第一版 instance-level 去重，尚未跨未載入區域搜尋世界所有 ItemFrame；未來若需要強一致領地 claim，應建立 server SavedData 的 territory identity／owner 層。
 

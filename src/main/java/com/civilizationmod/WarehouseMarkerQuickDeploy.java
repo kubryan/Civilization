@@ -1,7 +1,6 @@
 package com.civilizationmod;
 
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -12,21 +11,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 
 /** Server-validated crouch-right-click transfer into an empty ItemFrame. */
 public final class WarehouseMarkerQuickDeploy {
-    private static final double LOOK_RANGE = 16.0D;
-    private static final double MIN_LOOK_DOT = 0.92D;
-
     private WarehouseMarkerQuickDeploy() {
     }
 
     public static void register() {
         UseEntityCallback.EVENT.register(WarehouseMarkerQuickDeploy::interact);
-        UseItemCallback.EVENT.register(WarehouseMarkerQuickDeploy::interactWithAir);
     }
 
     private static InteractionResult interact(
@@ -46,27 +40,6 @@ public final class WarehouseMarkerQuickDeploy {
             return InteractionResult.PASS;
         }
 
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
-        if (!(level instanceof ServerLevel serverLevel)) {
-            return InteractionResult.FAIL;
-        }
-        return deployToFrame(serverLevel, player, player.getItemInHand(hand), frame);
-    }
-
-    private static InteractionResult interactWithAir(Player player, Level level, InteractionHand hand) {
-        if (hand != InteractionHand.MAIN_HAND
-                || !player.isShiftKeyDown()
-                || player.isSpectator()
-                || !BuildingMarkerRegistry.isTerritoryMarker(player.getItemInHand(hand))) {
-            return InteractionResult.PASS;
-        }
-
-        ItemFrame frame = findLookedAtEmptyItemFrame(level, player);
-        if (frame == null) {
-            return InteractionResult.PASS;
-        }
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
@@ -134,40 +107,6 @@ public final class WarehouseMarkerQuickDeploy {
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.building.deploy.success"));
         return InteractionResult.SUCCESS;
-    }
-
-    private static ItemFrame findLookedAtEmptyItemFrame(Level level, Player player) {
-        Vec3 eyePosition = player.getEyePosition(1.0F);
-        Vec3 viewVector = player.getViewVector(1.0F);
-        AABB searchBounds = new AABB(
-                player.getX() - LOOK_RANGE,
-                player.getY() - LOOK_RANGE,
-                player.getZ() - LOOK_RANGE,
-                player.getX() + LOOK_RANGE,
-                player.getY() + LOOK_RANGE,
-                player.getZ() + LOOK_RANGE);
-
-        ItemFrame nearest = null;
-        double nearestDistance = Double.MAX_VALUE;
-        for (ItemFrame candidate : level.getEntities(
-                EntityTypeTest.forClass(ItemFrame.class),
-                searchBounds,
-                frame -> frame.getItem() != null && frame.getItem().isEmpty())) {
-            Vec3 towardCandidate = candidate.getBoundingBox().getCenter().subtract(eyePosition);
-            double distance = towardCandidate.length();
-            if (distance > LOOK_RANGE || distance < 0.001D) {
-                continue;
-            }
-            double alignment = towardCandidate.normalize().dot(viewVector);
-            if (alignment < MIN_LOOK_DOT || !player.hasLineOfSight(candidate)) {
-                continue;
-            }
-            if (distance < nearestDistance) {
-                nearest = candidate;
-                nearestDistance = distance;
-            }
-        }
-        return nearest;
     }
 
     private static boolean hasOtherMarkerInTerritory(

@@ -109,8 +109,8 @@ Fabric 26.2 官方 Javadoc（https://maven.fabricmc.net/docs/fabric-api-0.158.0+
 Marker territory 目前安全上限為每軸 64 格、總體積 262144 格；這是 server-side 資料完整性與掃描成本保護，不代表玩家建築必須符合固定房屋尺寸。warehouse marker 的功能仍由 item registry 定義，territory 只定義玩家宣告的空間範圍，兩者不可混為箱子內容或聚落食物存量。
 
 
-## Marker tooltip 與快速部署（2026-08-20）
+## Marker tooltip 與直接 ItemFrame 部署（2026-08-20）
 
 Warehouse Marker CustomData 同時保存玩家原始點擊的 A/B 與正規化 min/max bounds；tooltip 顯示原始點，server validator 使用正規化 bounds。26.2 `Item.appendHoverText(ItemStack, Item.TooltipContext, TooltipDisplay, Consumer<Component>, TooltipFlag)` 只讀 component，不應在 tooltip 中改變狀態。
 
-玩家蹲下右鍵領地內的空 ItemFrame 時，可由 Fabric 26.2 `UseEntityCallback` server-side 驗證並使用 `handStack.copyWithCount(1)` 將同一份帶 CustomData 的 Marker 寫入 frame，再以 `handStack.shrink(1)` 消耗手上物品。不能重建純 item identity 的 Marker，否則拆下 ItemFrame 後會失去 warehouse territory。非空 ItemFrame、領地外、跨維度、未完成 territory 或未附著牆面時不得消耗 Marker。相同維度與 min/max bounds 的第二個有效 Marker 必須保存為 `duplicate_territory`，不能建立第二個 warehouse。
+玩家蹲下直接右鍵領地內的空 ItemFrame 時，可由 Fabric 26.2 `UseEntityCallback` server-side 驗證並使用 `handStack.copyWithCount(1)` 將同一份帶 CustomData 的 Marker 寫入 frame，再以 `handStack.shrink(1)` 消耗手上物品。不能重建純 item identity 的 Marker，否則拆下 ItemFrame 後會失去 warehouse territory。非空 ItemFrame、領地外、跨維度、未完成 territory 或未附著牆面時不得消耗 Marker。相同維度與 min/max bounds 的第二個有效 Marker 必須保存為 `duplicate_territory`，不能建立第二個 warehouse。已撤回蹲下右鍵空氣後尋找 ItemFrame 的路徑。

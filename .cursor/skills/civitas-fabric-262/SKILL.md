@@ -160,10 +160,11 @@ client-only 類別改查對應 `minecraft-client.jar`。常見 jar 路徑：`C:\
 - 玩家左鍵選 point A，右鍵選 point B（須手持同一 marker），生成 WarehouseTerritory（正規化 bounds）。
 - Territory 資料寫入 DataComponents.CUSTOM_DATA，隨 ItemStack 保存。
 
-#### 6.2 快速部署
+#### 6.2 直接部署至 ItemFrame
 
-- 玩家 蹲下 + 右鍵 空的 ItemFrame，且手中 marker 已有完整 territory → 將 marker 原封不動（含全部 NBT）轉移至 ItemFrame，手中數量減 1。
-- 使用 copyWithCount(1) 保留資料，不得 重建新 ItemStack。
+- 玩家蹲下並直接右鍵空的 ItemFrame，且手中 marker 已有完整 territory，才會將 marker 原封不動（含全部 CustomData）轉移至 ItemFrame，手中數量減 1。
+- 使用 `copyWithCount(1)` 保留資料，不得重建新 ItemStack。
+- 已撤回「蹲下右鍵空氣後以視線尋找 ItemFrame」路徑；不可重新加入 `UseItemCallback` air-target handler。
 
 #### 6.3 Building Scan
 
@@ -352,10 +353,10 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 
 ## 2026-08-21 — 住宅綁定裝置與重開後互動恢復
 
-- 任務：修正住宅 roster 重開後看似失效，並新增住宅綁定裝置、解除指派與快速放置 fallback。
+- 任務：修正住宅 roster 重開後看似失效，並新增住宅綁定裝置、解除指派與直接 ItemFrame 部署 fallback。
 - 已確認：Minecraft 26.2 common jar 的 `Player.getInventory()`、`Inventory.getContainerSize()`、`Inventory.getItem(int)` 可供 server-side inventory 掃描；`DataComponents.CUSTOM_DATA`、`CustomData.copyTag()`、`CustomData.of(CompoundTag)` 可保存與複製 ItemStack CustomData。
 - 採用：住宅綁定裝置以 `UseEntityCallback` 先蹲下右鍵有效住宅 ItemFrame 保存維度與 marker 座標，再右鍵 Villager 由 server 重新驗證 building、territory、床位與容量後加入 roster。開發測試可用 `/give @p civilizationmod:residence_binding_device`。
-- 採用：若手持同類 marker 沒有完成 territory，快速部署可從玩家 inventory 找到同類且帶完成 `WarehouseTerritory` 的 stack，複製完整 CustomData 後再消耗實際資料來源；不可重建只含 item identity 的 marker。
+- 採用：若手持同類 marker 沒有完成 territory，直接 ItemFrame 部署可從玩家 inventory 找到同類且帶完成 `WarehouseTerritory` 的 stack，複製完整 CustomData 後再消耗實際資料來源；不可重建只含 item identity 的 marker。空氣右鍵視線尋找 ItemFrame 的路徑已撤回。
 - 採用：`BuildingResidentService` 對保存 roster 的村民重新套用角色外套；invalid 建築只停止導航／物流，不阻止外觀與背包管理。新增 `/civitas unassign <building_index> [villager]`，相容 `/civilization`，沿用 suggestions 與 `EntityArgument.entity()`。
 - 禁止：不要因 SavedData NBT 已含 `resident_uuid`／`residents` 就先重寫 roster Codec；重開後失效優先查 role reapply、validation gate 與 `findBuildingAssignedTo`。不要用未查證的 ItemFrame 專用事件或猜測 inventory 欄位。
 - 查證：本機 `C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar` 的 javap；Fabric Events：https://docs.fabricmc.net/develop/events；Fabric Custom Item Interactions：https://docs.fabricmc.net/develop/items/custom-item-interactions；日期 2026-08-21。
@@ -467,12 +468,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 查證：26.2 common jar javap、Fabric events/custom interactions 文件與 Fabric API events-interaction jar；日期 2026-08-21。
 
 
-## 2026-08-21 — 通用 Civitas 綁定裝置與空氣右鍵快速部署
+## 2026-08-21 — 通用 Civitas 綁定裝置與快速部署歷史
 
 - 正式通用物品 ID 採 `civitas_binding_device`，顯示名稱為 Civitas Binding Device／Civitas 綁定裝置。舊 `residence_binding_device` 不刪除，改由相容 subclass 提供相同通用行為與 tooltip，避免既有物品 stack／世界資料失效；新配方輸出正式通用 ID。
 - 綁定 CustomData schema 座標格式不變；新資料 key 使用 `civitas_binding`，讀取時 fallback 到舊 `civitas_residence_binding`，因此已選住宅資料可被新裝置繼續使用。
 - `ResidenceBindingDeviceInteraction` 已泛化為所有 `BuildingMarkerRegistry.isKnownMarker(...)` 的有效 building observation。住宅仍做即時 territory／床位檢查、容量與 roster append；warehouse／Town Hall 沿用 `/civitas assign` 的 single-resident overwrite 語義，不新增未設計的容量規則。
-- Fabric API 0.158.0+26.2 jar javap 確認 `UseItemCallback.EVENT` 與 `interact(Player, Level, InteractionHand)`。因此直接右鍵空 ItemFrame 繼續由 `UseEntityCallback` 處理；蹲下右鍵空氣新增 `UseItemCallback`，不能假設 UseEntityCallback 會在 air target 觸發。
-- 空氣快速部署沿用已編譯的 villager look-target 模式：server／client 先用 16 格 AABB，對 `ItemFrame.getBoundingBox().getCenter()` 與 `Player.getEyePosition` 計算方向 dot，門檻 0.92，再用 `Player.hasLineOfSight`，取最近的空 ItemFrame。最後共用 dimension、territory、牆面附著、重複 marker、CustomData copy 與背包 fallback server 驗證。
-- 快速部署現在接受 warehouse／residence territory marker，仍排除 Town Hall；未完成 territory 只回傳既有 localized incomplete message，不修改 ItemFrame。
-- 查證：Fabric Events／Custom Item Interactions 官方文件、Fabric API 0.158.0+26.2 jar javap、專案 `BuildingResidentService.findLookedAtVillager`；日期 2026-08-21。
+- 歷史查證曾確認 Fabric API `UseItemCallback.EVENT` 與 `interact(Player, Level, InteractionHand)`，但本次撤回 air-target 快速部署後，runtime 不再註冊或使用此 callback。
+- 目前只保留直接右鍵 ItemFrame 的 `UseEntityCallback` 路徑；其 server 驗證仍包含 territory、維度、牆面附著、重複 marker、CustomData copy 與背包 fallback。
+- air-target 的視線 AABB／dot／line-of-sight 尋找器已撤回；不要把它當成可用功能或重新加入。
+- 查證：Fabric Events／Custom Item Interactions 官方文件、Fabric API 0.158.0+26.2 jar javap；air-target 路徑撤回日期 2026-08-21。

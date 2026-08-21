@@ -3877,3 +3877,43 @@ test { useJUnitPlatform() }
 
 - [1] https://docs.fabricmc.net/develop/automatic-testing — Fabric Automated Testing 26.2。
 - [2] https://docs.gradle.org/current/userguide/java_testing.html — Gradle Java Testing。
+
+
+## 2026-08-21 — 撤回失敗的蹲下右鍵空氣快速部署
+
+### 變更
+
+遊戲內驗收發現「蹲下右鍵空氣，依視線尋找空 ItemFrame 並部署 marker」不穩定，因此依使用者要求撤回這條功能。`WarehouseMarkerQuickDeploy` 現在只註冊並處理直接對 ItemFrame 的 `UseEntityCallback`；已移除 `UseItemCallback` air-target callback、16 格 AABB 視線搜尋、dot alignment 與 `findLookedAtEmptyItemFrame` 方法。
+
+保留的直接部署流程不變：玩家蹲下直接右鍵空 ItemFrame，server 驗證主手、非 spectator、territory、維度、領地範圍、ItemFrame 牆面附著、重複 marker 與 CustomData，成功後使用帶完整資料的 stack copy 寫入 ItemFrame，再消耗 marker。住宅與 warehouse 的兩點領地、marker ItemFrame 掃描、通用 Civitas 綁定裝置與舊 `residence_binding_device` 相容性不受此次移除影響。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/WarehouseMarkerQuickDeploy.java`：移除 `UseItemCallback` air-target 路徑與視線搜尋，只保留直接 ItemFrame callback。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：將現行規則改為直接 ItemFrame 部署，保留 air-target 的歷史查證但標記為撤回。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步撤回規則。
+- `.cursor/skills/civitas-fabric-262/verified-apis.md`：同步直接部署與撤回說明。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域 skill 規則。
+- `Mods.md`：追加本次移除原因、影響、驗證與下一步。
+
+### 驗證結果
+
+- source search：`WarehouseMarkerQuickDeploy.java` 只剩 `UseEntityCallback`、`deployToFrame` 與 territory bounds；不再包含 `UseItemCallback`、`interactWithAir` 或 `findLookedAtEmptyItemFrame`。
+- `gradlew.bat --no-daemon build --console=plain`：`BUILD SUCCESSFUL`。
+- `FoodModelRegressionTest`：由 `check` 自動執行並通過。
+- `CivitasCoreTest`：由 `build` 自動執行，既有 6 個 JUnit 案例通過。
+- `git diff --check`：提交前需確認無 whitespace error。
+
+### 未完成與風險
+
+本次只移除 air-target 快速部署，沒有新增直接 ItemFrame 的 GameTest；直接 ItemFrame 部署仍需在遊戲內人工確認。歷史 skill／Mods.md 記錄沒有刪除，而是標記 air-target 路徑已撤回，避免未來代理把已失敗方案重新當成現行功能。`UseItemCallback` 的 26.2 API 查證仍保留作歷史知識，但不再是本模組 runtime 依賴。
+
+### 下一步
+
+下一個主線功能建議回到 **市政廳殖民地歸屬切片**：同維度、Town Hall 半徑 64 內的有效住宅與 warehouse 綁定 Town Hall `colony_id`；沒有核心、超出範圍或核心衝突時明確標記為未綁定。完成後再建立 ResidentRecord，讓居民、住宅與工作建築具備穩定的殖民地資料關係。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/events — Fabric Events 26.2。
+- [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions 26.2。
+- [3] 本機 Minecraft 26.2／Fabric API 0.158.0+26.2 compile 與 `build` 驗證，日期 2026-08-21。
