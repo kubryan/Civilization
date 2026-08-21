@@ -100,6 +100,11 @@ public record WarehouseTerritory(
                 && containsAll(payload, POINT_X_KEY, POINT_Y_KEY, POINT_Z_KEY);
     }
 
+    public static Optional<String> selectedDimension(ItemStack stack) {
+        String dimension = payload(stack).getStringOr(DIMENSION_KEY, "");
+        return dimension.isBlank() ? Optional.empty() : Optional.of(dimension);
+    }
+
     public static void setPointA(ItemStack stack, String dimension, BlockPos position) {
         CompoundTag payload = new CompoundTag();
         payload.putInt(VERSION_KEY, CURRENT_VERSION);

@@ -2980,3 +2980,62 @@ README 修改為文件內容，沒有新增 Minecraft API 或 Java 程式碼，�
 - 本機 commit 尚未因本次 README 修改重新 amend。
 - GitHub repository 仍未完成 push，原因是目前 Windows Git 認證帳號 `KuBryan-614` 收到 HTTP 403。
 - 下一步將把 README 與本記錄加入本機 commit；使用者完成 Git Credential Manager 重新登入後，再執行 `git push -u origin main`。
+
+
+## 2026-08-21 — 住宅 Marker 視覺資產與領地可視化預覽
+
+### 變更
+
+完成住宅 marker 的獨立視覺資產。新增四個原創 16×16 RGBA Minecraft 像素風格圖示：床的側視圖加上金色容量數字 `1`、`2`、`4`、`6`；住宅 marker 不再共用 warehouse marker 紋理。四個 item model 的 `layer0` 已分別指向對應的 residential marker texture。
+
+完成建築領地選取預覽的第一版。新增 common/server-side `CivitasTerritoryPreviewService`，玩家手持任一已註冊 Civitas building marker 時，point A pending 狀態會顯示端點粒子；A/B 都完成後，以 `END_ROD` 粒子描繪正規化 bounds 的 12 條 cuboid 邊線，並以端點粒子標示 A/B。預覽每 5 server ticks 更新一次，每條邊最多 24 個 interval，預覽只發送給選取玩家。切換離開未完成 marker 時沿用既有 `inventoryTick` 清除 pending selection；完成領地仍保存，但不持有 marker 時不顯示。
+
+本次已查證 `LevelRenderContext` 的實際 26.2 API，但沒有猜測 `VertexConsumer` 或 `LevelRenderer.renderLineBox`。`fabric-rendering-v1` `25.3.2+515ac5339e` source 確認 `LevelRenderContext` 繼承 `LevelTerrainRenderContext`，公開 `submitNodeCollector()` 與 `poseStack()`；`LevelRenderEvents.BeforeGizmos` callback 為 `void beforeGizmos(LevelRenderContext context)`。考量目前只需要選取者看見邊界，第一版採 server particle fallback，避免 dedicated server 載入 client-only renderer，也避免把未查證的線框繪製簽名寫入 common/client 程式。
+
+### 影響檔案
+
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_1.png`：新增 1 床住宅 marker 16×16 圖示。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_2.png`：新增 2 床住宅 marker 16×16 圖示。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_4.png`：新增 4 床住宅 marker 16×16 圖示。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_6.png`：新增 6 床住宅 marker 16×16 圖示。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_1.json`：指向 `residential_marker_1` texture。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_2.json`：指向 `residential_marker_2` texture。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_4.json`：指向 `residential_marker_4` texture。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_6.json`：指向 `residential_marker_6` texture。
+- `src/main/java/com/civilizationmod/CivitasTerritoryPreviewService.java`：新增 server-side 粒子預覽服務。
+- `src/main/java/com/civilizationmod/CivilizationMod.java`：註冊領地預覽 server tick service。
+- `src/main/java/com/civilizationmod/WarehouseTerritory.java`：新增 `selectedDimension(ItemStack)`，讓 preview 依 marker CustomData 維度過濾。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：同步新的 26.2 render context 與粒子 fallback 查證。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步新的 26.2 render context 與粒子 fallback 查證。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域可重用技能查證。
+- `Mods.md`：追加本次歷史記錄。
+
+### 查證與驗證
+
+| 項目 | 結果 |
+|---|---|
+| 版本 | Minecraft `26.2`、Fabric Loader `0.19.3`、Fabric API `0.158.0+26.2`、Loom 實際 `1.17.19`、Gradle `9.5.1`、Java toolchain `25`。 |
+| LevelRenderContext source | 通過；實際 `fabric-rendering-v1-25.3.2+515ac5339e-sources.jar` 確認 `submitNodeCollector()` 與 `poseStack()`。 |
+| `gradlew.bat --no-daemon compileJava --console=plain` | `BUILD SUCCESSFUL`，確認 `CivitasTerritoryPreviewService`、`selectedDimension` 與 server particle API 可編譯。 |
+| `gradlew.bat --no-daemon build --console=plain` | `BUILD SUCCESSFUL`，common、client、resources、jar、test 與 assemble 通過。 |
+| `gradlew.bat --no-daemon clean build --console=plain` | `BUILD SUCCESSFUL`，清潔建置後完整通過。 |
+| 資產檢查 | 通過；四個 PNG 均為 `16×16`，四個 JSON 的 `layer0` 均指向各自 `residential_marker_1/2/4/6`。 |
+| `git diff --check` | 沒有 whitespace error；Git 只提示既有跨平台 LF/CRLF 轉換警告。 |
+| `runClient` smoke test | 通過 Fabric/Minecraft 載入、client initialization、texture atlas 與 Render thread 初始化；因 `runClient` 是持續任務而主動停止，沒有進行遊戲內滑鼠操作。Realms authentication 訊息屬開發環境登入服務，非本模組錯誤。 |
+
+### 未完成與風險
+
+- 尚未由玩家在實際世界完成一次 A 點、B 點、切換快捷欄、放入 ItemFrame 與重新拿起 marker 的完整視覺驗收；目前已完成編譯與 client 啟動驗證。
+- 本版使用 server 粒子預覽，不是 client 線框 renderer；粒子在距離過遠、粒子設定關閉或大型領地時的實際可讀性仍需遊戲內觀察。
+- `LevelRenderContext` 的 `PoseStack` 與 `SubmitNodeCollector` 已查證，但若未來要改成真正線框，仍必須另行查證 26.2 collector、render pipeline 與 camera-relative 座標的完整簽名，不能直接移植舊版 `VertexConsumer` 寫法。
+- GitHub push 仍未完成；目前 remote 的 HTTP 認證仍回報 `KuBryan-614` 沒有 `kubryan/Civilization` 寫入權限。
+
+### 下一步
+
+先在遊戲內驗收領地預覽：手持 `warehouse_marker` 或住宅 marker，左鍵選 A、右鍵選 B，確認 A 點粒子與完整 12 邊界線出現；切換快捷欄確認未完成選取取消；切回已完成 marker 確認領地預覽恢復。之後再處理真正 client gizmo 線框是否值得替換粒子方案，並等待使用者修正 GitHub Credential Manager 後再執行 `git push -u origin main`。
+
+### 來源
+
+- [1] [Fabric Events 26.2](https://docs.fabricmc.net/develop/events)
+- [2] [Fabric Rendering API](https://docs.fabricmc.net/develop/rendering)
+- [3] 本機 Fabric API `fabric-rendering-v1-25.3.2+515ac5339e-sources.jar` 的 `LevelRenderContext.java`；查證日期 2026-08-21。

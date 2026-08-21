@@ -315,3 +315,14 @@ Fabric 官方文件（26.2）：Creating a Project、Saved Data、Commands、Eve
 - https://docs.fabricmc.net/develop/data-generation/setup
 - https://docs.fabricmc.net/develop/porting/
 - https://fabricmc.net/2026/06/15/262.html
+
+
+## 已查證：26.2 領地預覽 render context 與粒子 fallback（2026-08-21）
+
+Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認 `net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext` 為 `@ApiStatus.NonExtendable` interface，繼承 `LevelTerrainRenderContext`，並公開 `SubmitNodeCollector submitNodeCollector()` 與 `PoseStack poseStack()`。同一版本的 `LevelRenderEvents.BeforeGizmos` callback 形式為 `void beforeGizmos(LevelRenderContext context)`；這證明 client gizmo renderer 可以取得 26.2 `PoseStack`，但不代表可直接猜測 `VertexConsumer` 或 `LevelRenderer.renderLineBox` 的簽名。
+
+本專案第一版領地預覽不依賴未查證的 client 線框 API，而採 common/server-side 粒子 fallback：`CivitasTerritoryPreviewService` 使用已編譯確認的 `ServerTickEvents.END_SERVER_TICK` 與 `ServerLevel.sendParticles(ServerPlayer, ParticleOptions, boolean, boolean, double, double, double, int, double, double, double, double)`，每 5 server ticks 只對持有 Civitas building marker 的選取玩家發送預覽。只有 point A 時發送 `HAPPY_VILLAGER`；完成 A/B 後以 12 條 cuboid 邊線採 `END_ROD` 粒子、兩端追加 endpoint 粒子。每條邊最多 24 個 interval，避免大型領地每 tick 產生無界粒子量。
+
+預覽只讀 marker ItemStack 的 `WarehouseTerritory` CustomData／`selectedDimension`；不讀 client Saved Data，不改寫 server 狀態。切換離開未完成 marker 時，既有 `inventoryTick` 規則會清除 pending point；完成 territory 可以保存，但換回 marker 前不顯示預覽。此方案與 `LevelRenderEvents.BeforeGizmos` 的 client-only 路線分離，避免 dedicated server 載入 client 類別。
+
+查證證據：Fabric API 25.3.2+515ac5339e sources `LevelRenderContext.java`、實際 26.2 compile 與 build；官方事件背景文件：[Fabric Events 26.2](https://docs.fabricmc.net/develop/events)。
