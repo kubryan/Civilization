@@ -28,7 +28,7 @@ import java.util.Set;
  * client.</p>
  */
 public final class CivilizationWorldData extends SavedData {
-        private static final int CURRENT_SCHEMA_VERSION = 7;
+        private static final int CURRENT_SCHEMA_VERSION = 8;
 
     private static final int BUILDING_BIND_HORIZONTAL_RADIUS = 128;
     private static final int BUILDING_BIND_VERTICAL_RADIUS = 64;
@@ -39,7 +39,9 @@ public final class CivilizationWorldData extends SavedData {
             Codec.INT.fieldOf("settlement_count").forGetter(CivilizationWorldData::getSettlementCount),
                         SettlementAdapter.CODEC.listOf().optionalFieldOf("settlements", List.of()).forGetter(CivilizationWorldData::getSettlements),
             BuildingObservation.CODEC.listOf().optionalFieldOf("buildings", List.of()).forGetter(CivilizationWorldData::getBuildings),
-            TownHallCore.CODEC.listOf().optionalFieldOf("town_halls", List.of()).forGetter(CivilizationWorldData::getTownHallCores)
+            TownHallCore.CODEC.listOf().optionalFieldOf("town_halls", List.of()).forGetter(CivilizationWorldData::getTownHallCores),
+            ResidentRegistry.CODEC.optionalFieldOf("resident_registry", new ResidentRegistry())
+                    .forGetter(CivilizationWorldData::getResidentRegistry)
 
     ).apply(instance, CivilizationWorldData::new));
 
@@ -55,9 +57,10 @@ public final class CivilizationWorldData extends SavedData {
     private final List<SettlementAdapter> settlements;
     private final List<BuildingObservation> buildings;
     private final List<TownHallCore> townHallCores;
+    private final ResidentRegistry residentRegistry;
 
     public CivilizationWorldData() {
-        this(CURRENT_SCHEMA_VERSION, 0L, 0, List.of(), List.of(), List.of());
+        this(CURRENT_SCHEMA_VERSION, 0L, 0, List.of(), List.of(), List.of(), new ResidentRegistry());
     }
 
     private CivilizationWorldData(
@@ -66,7 +69,8 @@ public final class CivilizationWorldData extends SavedData {
                         int ignoredSettlementCount,
             List<SettlementAdapter> settlements,
             List<BuildingObservation> buildings,
-            List<TownHallCore> townHallCores
+            List<TownHallCore> townHallCores,
+            ResidentRegistry residentRegistry
     ) {
 
         this.schemaVersion = Math.max(schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -74,6 +78,7 @@ public final class CivilizationWorldData extends SavedData {
         this.settlements = new ArrayList<>(settlements);
         this.buildings = new ArrayList<>(buildings);
         this.townHallCores = new ArrayList<>(townHallCores);
+        this.residentRegistry = residentRegistry == null ? new ResidentRegistry() : residentRegistry;
     }
 
     public static CivilizationWorldData get(MinecraftServer server) {
@@ -87,6 +92,7 @@ public final class CivilizationWorldData extends SavedData {
                 data.removeDuplicateSettlements();
         data.removeDuplicateBuildings();
         data.removeDuplicateTownHallCores();
+        data.migrateLegacyResidents();
         return data;
 
     }
@@ -163,6 +169,23 @@ public final class CivilizationWorldData extends SavedData {
 
     public int getTownHallCoreCount() {
         return this.townHallCores.size();
+    }
+
+    public ResidentRegistry getResidentRegistry() {
+        return this.residentRegistry;
+    }
+
+    public List<ResidentRecord> getResidents() {
+        return this.residentRegistry.getResidents();
+    }
+
+    private int migrateLegacyResidents() {
+        int added = this.residentRegistry.migrateLegacy(this.buildings);
+        int refreshed = this.residentRegistry.refreshAssignmentsFromBuildings(this.buildings);
+        if (added > 0 || refreshed > 0) {
+            this.setDirty();
+        }
+        return added + refreshed;
     }
 
     public TownHallCore getTownHallCore(String dimension) {
@@ -374,10 +397,75 @@ public final class CivilizationWorldData extends SavedData {
         if (residentUuid == null || residentUuid.isBlank()) {
             return null;
         }
+        ResidentRecord resident = this.residentRegistry.findByEntityUuid(residentUuid);
+        if (resident != null) {
+            BuildingObservation canonical = findBuildingByKey(resident.assignedBuildingKey());
+            if (canonical != null) {
+                return canonical;
+            }
+        }
         return this.buildings.stream()
                 .filter(existing -> existing.hasResidentUuid(residentUuid))
                 .findFirst()
                 .orElse(null);
+    }
+
+    public BuildingObservation findBuildingAssignedToResidentId(String residentId) {
+        ResidentRecord resident = this.residentRegistry.findByResidentId(residentId);
+        return resident == null ? null : findBuildingByKey(resident.assignedBuildingKey());
+    }
+
+    public BuildingObservation findBuildingByKey(String serializedKey) {
+        return ResidentRecord.BuildingKey.parse(serializedKey)
+                .map(key -> findBuilding(
+                        key.dimension(),
+                        key.markerX(),
+                        key.markerY(),
+                        key.markerZ()))
+                .orElse(null);
+    }
+
+    public ResidentRecord ensureResidentAssignment(
+            BuildingObservation building,
+            java.util.UUID entityUuid,
+            String name,
+            long observedAt
+    ) {
+        if (building == null || entityUuid == null) {
+            return null;
+        }
+        String role = BuildingFunction.RESIDENCE.id().equals(building.functionId())
+                ? ResidentRecord.ROLE_RESIDENT
+                : ResidentRecord.ROLE_WAREHOUSE_WORKER;
+        ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
+        ResidentRecord replacement = current == null
+                ? ResidentRegistry.createNew(entityUuid, building, role, name, observedAt)
+                : current.withAssignment(
+                        ResidentRecord.BuildingKey.from(building),
+                        building.colonyId(),
+                        role,
+                        observedAt);
+        if (replacement == null || !this.residentRegistry.upsert(replacement)) {
+            return null;
+        }
+        this.setDirty();
+        return replacement;
+    }
+
+    public boolean clearResidentAssignment(java.util.UUID entityUuid, long observedAt) {
+        if (entityUuid == null) {
+            return false;
+        }
+        ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
+        if (current == null) {
+            return false;
+        }
+        ResidentRecord replacement = current.withClearedAssignment(observedAt);
+        if (!this.residentRegistry.upsert(replacement)) {
+            return false;
+        }
+        this.setDirty();
+        return true;
     }
 
     public boolean replaceBuilding(BuildingObservation current, BuildingObservation replacement) {

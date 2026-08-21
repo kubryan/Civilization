@@ -4030,3 +4030,58 @@ test { useJUnitPlatform() }
 ### 下一步
 
 啟動 `runClient`，進入創造模式開啟物品欄，確認出現 `創世紀元 / Civitas` 分頁，並確認 warehouse、四種住宅、市政廳、通用綁定裝置與 legacy 裝置都能取得。驗收後繼續 ResidentRecord／ResidentRegistry 資料層。
+
+
+## 2026-08-21 — ResidentRecord／ResidentRegistry 第一版居民資料層
+
+### 變更
+
+完成第一版居民資料層，將 Civitas 居民的永久邏輯身份與目前 Minecraft body 分離。新增 `ResidentRecord` 與 `ResidentRegistry`；`residentId` 是永久身份，`entityUuid` 是目前原版 Villager body UUID。舊 `BuildingObservation.residents` roster 會在 `CivilizationWorldData` 載入後冪等遷移；第一階段 legacy UUID 同時作為 residentId 與 entityUuid，新 assign 則建立獨立的 residentId。
+
+`ResidentRecord` 現在保存殖民地 ID、住宅 building key、工作 building key、角色、body type、lifecycle、診斷名稱、建立時間與最近觀測時間。建築關係使用 `dimension@x,y,z` marker key，不保存易變的一次性 building scan index。未載入 chunk 找不到 body 時不會清除 entityUuid，第一版也不自動復活死亡原版村民。
+
+`CivilizationWorldData` 的 SavedData Codec 新增 optional `resident_registry` 欄位，schema version 由 7 升至 8。`BuildingResidentService` 改為優先使用 registry 的 assigned building key 與 entityUuid 導航、套用角色外觀及執行 warehouse 物流；`findBuildingAssignedTo(String)` 保留 legacy roster fallback。`/civitas assign`、`/civitas unassign` 與通用綁定裝置會同步更新 registry。
+
+新增 `/civitas resident list`，並由既有共用命令樹自動提供 `/civilization resident list` 相容別名。列表顯示 residentId、body UUID、colony、住宅、工作、角色、body type、lifecycle 與名稱；三份 locale 均已加入翻譯 key。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/ResidentRecord.java`：新增永久居民記錄、雙 UUID、建築 key、角色與 lifecycle Codec。
+- `src/main/java/com/civilizationmod/ResidentRegistry.java`：新增 canonical list、legacy roster migration、lookup、assignment upsert 與解除指派。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：SavedData optional registry、schema 8、遷移與 resident lookup／assignment API。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：assign／unassign 同步 registry，新增 `resident list` 命令。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：改用 registry 解析居民並保留物流閉環。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：綁定裝置同步建立／更新 ResidentRecord。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增 legacy migration 冪等、雙 UUID 分離、building key 與 Codec round-trip 測試。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增 resident list 英文訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：新增 resident list 繁體中文訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策新增相同繁體中文訊息。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 ResidentRecord、ResidentRegistry 與 26.2 API 查證規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步技能副本。
+- `Mods.md`：追加本次進度。
+
+### 查證與驗證
+
+- 版本：Minecraft `26.2`；Fabric Loader `0.19.3`；Fabric API `0.158.0+26.2`；Fabric Loom 實際 `1.17.19`；Gradle `9.5.1`；Java toolchain `25`。
+- 本機 JDK 25 `javap` 已確認 `Entity.getUUID()`、`Entity.setUUID(UUID)`、`ServerLevel.getEntityInAnyDimension(UUID)`、`ServerLevel.getDataStorage()`、`net.minecraft.world.level.storage.SavedDataStorage.computeIfAbsent(SavedDataType<T>)` 與 `SavedDataType(Identifier, Supplier<T>, Codec<T>, DataFixTypes)`。
+- 明確禁止使用未查證的 `level.getEntity(UUID)`。
+- `gradlew.bat --no-daemon compileJava compileClientJava --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain`：JUnit 通過，`FoodModelRegressionTest: PASS`。
+- `gradlew.bat --no-daemon build --console=plain`：`BUILD SUCCESSFUL`，check、jar、assemble 均通過。
+
+### 未完成與風險
+
+- 尚未由遊戲內手動驗收 `/civitas resident list` 的文字、`/civilization resident list` 相容別名與 Tab completion。
+- 尚未以實際既有世界重開確認 `resident_registry` 在 `civilization_world.dat` 中保存並成功遷移；本次已通過 Registry Codec 與編譯／測試，但尚未建立 GameTest 的 SavedData reload 情境。
+- ItemFrame 真實掃描、居民重新進入世界後的 body lookup、村民死亡／移除 lifecycle、body rebind 與多居民住宅的完整 gameplay 仍待後續驗收。
+- `BuildingObservation.residents` 仍保留作為舊世界與相容層資料；下一階段才考慮將新的 assign 寫入改為 residentId-aware roster，而不應直接刪除 legacy 欄位。
+
+### 下一步
+
+在遊戲內驗收 `/civitas resident list` 與 `/civilization resident list`；確認既有住宅／warehouse 指派不重複建立居民、重開世界後列表仍存在，再進入 `ResidentRecord` 的 lifecycle 更新與住宅／工作雙重關係查詢。暫時不建立自訂 NPC Entity。
+
+### 來源
+
+- [1] Fabric Saved Data 26.2：https://docs.fabricmc.net/develop/saved-data
+- [2] Fabric Commands 26.2：https://docs.fabricmc.net/develop/commands/basics
+- [3] Minecraft 26.2 common jar：`C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`，以 JDK 25 `javap` 查證，2026-08-21。

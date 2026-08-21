@@ -208,6 +208,15 @@ public final class ResidenceBindingDeviceInteraction {
                     "civilizationmod.command.assign.save_failed"));
             return InteractionResult.FAIL;
         }
+        if (data.ensureResidentAssignment(
+                replacement,
+                villager.getUUID(),
+                villager.getName().getString(),
+                player.level().getGameTime()) == null) {
+            player.sendSystemMessage(CivilizationMessages.translatable(
+                    "civilizationmod.command.assign.save_failed"));
+            return InteractionResult.FAIL;
+        }
         BuildingResidentService.applyAssignmentVisual(villager, replacement.functionId());
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.binding.bind.success",

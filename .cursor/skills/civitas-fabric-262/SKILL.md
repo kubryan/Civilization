@@ -510,3 +510,15 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 ## 2026-08-21 — Creative Tab package 以實際 Fabric API jar 為準
 
 官方 Creative Tabs 範例的 builder 概念可採用，但本專案 Fabric API `0.158.0+26.2` 實際 jar 的 package 是 `net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab`，不是 `net.fabricmc.fabric.api.itemgroup.v1`。同一 jar 也包含 `CreativeModeTabEvents`；新增 Civitas 自訂 tab 使用已編譯確認的 `creativetab.v1` package。
+
+
+## 2026-08-21 — ResidentRecord／ResidentRegistry 第一版資料層
+
+- 任務：將居民永久身份與目前 Minecraft body 分離，不立即新增自訂 Entity。
+- 已確認：`residentId` 是永久邏輯身份，`entityUuid` 是目前 body UUID；legacy `BuildingObservation.ResidentAssignment.uuid` 遷移時第一階段可同時作為兩者，新的 assign 建立獨立 `residentId`。`ResidentRecord` 保存 `colonyId`、`homeBuildingKey`、`workBuildingKey`、`role`、`bodyType`、`lifecycle`、診斷名稱與時間欄位。
+- 採用：`ResidentRegistry` 的 canonical list／Codec 是唯一持久化真相；lookup 由 list 重新查詢，不建立第二份可修改的 index。建築關係使用 `dimension@x,y,z` marker key，不保存易變的 one-based building scan index。SavedData optional `resident_registry` 使 schema version 由 7 升至 8，載入後冪等遷移 legacy roster；未載入 body 不清除 entityUuid，第一版不自動復活死亡村民。
+- 已查證：Minecraft 26.2 common jar 的 `Entity.getUUID()`、`Entity.setUUID(UUID)`、`ServerLevel.getEntityInAnyDimension(UUID)`、`ServerLevel.getDataStorage()`、`net.minecraft.world.level.storage.SavedDataStorage.computeIfAbsent(SavedDataType<T>)`，以及 `SavedDataType(Identifier, Supplier<T>, Codec<T>, DataFixTypes)`。
+- 採用：`BuildingResidentService` 優先透過 registry 的 assigned building key／entity UUID 導航與物流；`findBuildingAssignedTo(String)` 保留 roster fallback。新增 `/civitas resident list` 與 `/civilization resident list`，只含 literal 子命令，不新增無 suggestions 的字串參數。
+- 禁止：不要使用未查證的 `level.getEntity(UUID)`；不要把 runtime indexes 當成第二真相；不要因 chunk unload 清除 entityUuid；不要把 colony truth 只塞進 Entity NBT。
+- 驗證：`compileJava compileClientJava`、`test`、`runFoodModelRegressionTest`、`build` 均成功；新增 JUnit 覆蓋 legacy migration idempotency、雙 UUID 分離、building key 與 Registry Codec round-trip。ItemFrame 真實 gameplay、SavedData 重開與 body rebind 尚未由 GameTest 覆蓋。
+- 查證日期：2026-08-21；方式：本機 JDK 25 `javap`、Minecraft 26.2 common jar、實際 Gradle 編譯／測試。

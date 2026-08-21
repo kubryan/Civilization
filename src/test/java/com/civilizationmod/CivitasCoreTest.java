@@ -12,6 +12,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,6 +118,60 @@ class CivitasCoreTest {
         assertEquals("minecraft:overworld@townhall", decoded.colonyId());
         assertEquals(BuildingObservation.COLONY_REASON_BOUND, decoded.colonyBindingReason());
         assertEquals(1, residence.withResident(RESIDENT_ONE, "Legacy Resident").residentCount());
+    }
+
+    @Test
+    void residentRegistryMigratesLegacyRosterIdempotentlyAndRoundTrips() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                40,
+                70,
+                -12,
+                BuildingObservation.STATUS_BOUND,
+                300L,
+                300L,
+                "minecraft:overworld",
+                0,
+                70,
+                0)
+                .withValidation(BuildingObservation.VALIDATION_VALID, BuildingObservation.VALIDATION_REASON_VALID)
+                .withResidenceMeasurements(2, 2)
+                .withColonyBinding(
+                        BuildingObservation.STATUS_BOUND,
+                        "minecraft:overworld@townhall-1",
+                        BuildingObservation.COLONY_REASON_BOUND)
+                .withResident(RESIDENT_ONE, "Legacy Resident");
+
+        ResidentRegistry registry = new ResidentRegistry();
+        assertEquals(1, registry.migrateLegacy(java.util.List.of(residence)));
+        assertEquals(0, registry.migrateLegacy(java.util.List.of(residence)));
+        assertEquals(1, registry.size());
+
+        ResidentRecord migrated = registry.findByResidentId(RESIDENT_ONE);
+        assertNotNull(migrated);
+        assertEquals(RESIDENT_ONE.toString(), migrated.entityUuid());
+        assertEquals("minecraft:overworld@townhall-1", migrated.colonyId());
+        assertEquals(ResidentRecord.ROLE_RESIDENT, migrated.role());
+        assertEquals(
+                "minecraft:overworld@40,70,-12",
+                migrated.homeBuildingKey());
+
+        var encoded = ResidentRegistry.CODEC.encodeStart(JsonOps.INSTANCE, registry).getOrThrow();
+        ResidentRegistry decoded = ResidentRegistry.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertEquals(registry.getResidents(), decoded.getResidents());
+
+        ResidentRecord replacementBody = ResidentRegistry.createNew(
+                RESIDENT_TWO,
+                residence,
+                ResidentRecord.ROLE_RESIDENT,
+                "New Body",
+                400L);
+        assertNotNull(replacementBody);
+        assertNotEquals(replacementBody.residentId(), replacementBody.entityUuid());
+        assertTrue(registry.upsert(replacementBody));
+        assertSame(replacementBody,
+                registry.findByEntityUuid(RESIDENT_TWO));
     }
 
     @Test

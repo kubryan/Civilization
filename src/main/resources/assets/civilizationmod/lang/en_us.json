@@ -171,5 +171,7 @@
   "civilizationmod.item.marker.territory.unconfigured": "Building territory: not configured",
   "civilizationmod.item.residential_marker.capacity": "Residential capacity: %1$d beds",
   "civilizationmod.villager.backpack.title": "Villager Backpack",
-  "civilizationmod.villager.backpack.player_inventory": "Player Inventory"
+  "civilizationmod.villager.backpack.player_inventory": "Player Inventory",
+  "civilizationmod.command.resident.none": "No Civitas residents are registered.",
+  "civilizationmod.command.resident.entry": "Resident #%1$d: residentId=%2$s, body UUID=%3$s, colony=%4$s, home=%5$s, work=%6$s, role=%7$s, body=%8$s, lifecycle=%9$s, name=%10$s"
 }

@@ -599,3 +599,18 @@ Fabric 官方 26.2 Custom Creative Tabs 文件確認：自訂創造模式分頁�
 ## 已確認：Fabric API 0.158.0+26.2 Creative Tab package（2026-08-21）
 
 官方 Custom Creative Tabs 文件的 builder 流程可採用，但目前實際依賴 jar `fabric-creative-tab-api-v1-5.0.14+d871b99e9e.jar` 的公開 class package 是 `net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab`；同 jar 另有 `CreativeModeTabEvents`。不要使用不存在的 `net.fabricmc.fabric.api.itemgroup.v1` package。
+
+
+## 已採用：ResidentRecord／ResidentRegistry 第一版資料層（2026-08-21）
+
+`residentId` 是 Civitas 永久邏輯身份，`entityUuid` 是目前 Minecraft body UUID。legacy `BuildingObservation.ResidentAssignment.uuid` 遷移時第一階段把既有 UUID 同時作為兩者；新的 assign 建立獨立的隨機 `residentId`。`ResidentRecord` 保存 `colonyId`、`homeBuildingKey`、`workBuildingKey`、`role`、`bodyType`、`lifecycle`、診斷名稱與時間欄位。
+
+`ResidentRegistry` 的 canonical list／Codec 是唯一持久化真相，lookup 由 list 查詢，不建立第二份可修改的 index。建築關係使用 `dimension@x,y,z` marker key，不保存易變的 one-based building scan index。`CivilizationWorldData` 新增 optional `resident_registry`，schema version 由 7 升至 8；SavedData 載入後冪等遷移 legacy roster，未載入 body 不清除 entityUuid，第一版不自動復活死亡村民。
+
+本機 Minecraft 26.2 common jar javap 已確認 `Entity.getUUID()`、`Entity.setUUID(UUID)`、`ServerLevel.getEntityInAnyDimension(UUID)`、`ServerLevel.getDataStorage()`、`net.minecraft.world.level.storage.SavedDataStorage.computeIfAbsent(SavedDataType<T>)` 與 `SavedDataType(Identifier, Supplier<T>, Codec<T>, DataFixTypes)`。禁止使用未查證的 `level.getEntity(UUID)`。
+
+`BuildingResidentService` 優先由 registry 的 assigned building key／entity UUID 導航與物流；`CivilizationWorldData.findBuildingAssignedTo(String)` 保留 legacy roster fallback。新增 `/civitas resident list` 與 `/civilization resident list`，只有 literal 子命令，不新增無 suggestions 的字串參數。
+
+驗證：`compileJava compileClientJava`、`test`、`runFoodModelRegressionTest` 與 `build` 成功；新增 JUnit 覆蓋 legacy migration idempotency、雙 UUID 分離、building key 與 Registry Codec round-trip。ItemFrame 真實 gameplay、SavedData 重開與 body rebind 尚未由 GameTest 覆蓋。
+
+查證日期：2026-08-21；查證方式：本機 JDK 25 `javap`、Minecraft 26.2 common jar、實際 Gradle 編譯／測試。

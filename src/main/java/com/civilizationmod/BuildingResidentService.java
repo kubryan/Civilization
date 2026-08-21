@@ -89,8 +89,8 @@ public final class BuildingResidentService {
             }
         }
 
-        for (int index = 1; index <= data.getBuildingCount(); index++) {
-                        BuildingObservation building = data.getBuilding(index);
+                for (ResidentRecord resident : data.getResidents()) {
+            BuildingObservation building = data.findBuildingByKey(resident.assignedBuildingKey());
             if (building == null) {
                 continue;
             }
@@ -98,47 +98,42 @@ public final class BuildingResidentService {
                     && building.isColonyBound();
 
             ServerLevel buildingLevel = findLevel(server, building.dimension());
-
-            if (buildingLevel == null) {
+            Optional<UUID> residentUuid = resident.entityUuidValue();
+            if (buildingLevel == null || residentUuid.isEmpty()) {
                 continue;
             }
 
+            Entity entity = buildingLevel.getEntityInAnyDimension(residentUuid.get());
+            if (!(entity instanceof Villager villager)
+                    || villager.level() != buildingLevel
+                    || !villager.isAlive()) {
+                continue;
+            }
+
+            applyAssignmentVisual(villager, building.functionId());
+            if (!buildingValid) {
+                continue;
+            }
             BlockPos marker = new BlockPos(building.markerX(), building.markerY(), building.markerZ());
-            for (BuildingObservation.ResidentAssignment resident : building.residents()) {
-                Optional<UUID> residentUuid = resident.uuidValue();
-                if (residentUuid.isEmpty()) {
-                    continue;
-                }
-
-                Entity entity = buildingLevel.getEntityInAnyDimension(residentUuid.get());
-                if (!(entity instanceof Villager villager)
-                        || villager.level() != buildingLevel
-                        || !villager.isAlive()) {
-                    continue;
-                }
-
-                applyAssignmentVisual(villager, building.functionId());
-                if (!buildingValid) {
-                    continue;
-                }
-                if (villager.distanceToSqr(marker.getX() + 0.5D, marker.getY(), marker.getZ() + 0.5D)
-                        > ARRIVAL_DISTANCE_SQUARED) {
-                    villager.getNavigation().moveTo(
-                            marker.getX() + 0.5D,
-                            marker.getY(),
-                            marker.getZ() + 0.5D,
-                            MOVE_SPEED);
-                } else if (BuildingFunction.WAREHOUSE.id().equals(building.functionId())) {
-                    BuildingLogisticsService.tryDeposit(
-                            server,
-                            data,
-                            index,
-                            building,
-                            buildingLevel,
-                            villager);
-                }
+            if (villager.distanceToSqr(marker.getX() + 0.5D, marker.getY(), marker.getZ() + 0.5D)
+                    > ARRIVAL_DISTANCE_SQUARED) {
+                villager.getNavigation().moveTo(
+                        marker.getX() + 0.5D,
+                        marker.getY(),
+                        marker.getZ() + 0.5D,
+                        MOVE_SPEED);
+            } else if (BuildingFunction.WAREHOUSE.id().equals(building.functionId())) {
+                int buildingIndex = data.getBuildings().indexOf(building) + 1;
+                BuildingLogisticsService.tryDeposit(
+                        server,
+                        data,
+                        buildingIndex,
+                        building,
+                        buildingLevel,
+                        villager);
             }
         }
+
     }
 
     private static ServerLevel findLevel(MinecraftServer server, String dimensionId) {

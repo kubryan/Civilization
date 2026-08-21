@@ -62,6 +62,7 @@ public final class CivilizationCommands {
                                                 .then(assignCommand())
 
                         .then(unassignCommand())
+                        .then(residentCommand())
                         .then(simulateCommand())
 
 					.then(scanCommand("scan"))
@@ -124,6 +125,38 @@ public final class CivilizationCommands {
                                                 context.getSource(),
                                                 IntegerArgumentType.getInteger(context, "building_index"),
                                                 EntityArgument.getEntity(context, "villager")))));
+        }
+
+        private static LiteralArgumentBuilder<CommandSourceStack> residentCommand() {
+                return Commands.literal("resident")
+                        .then(Commands.literal("list")
+                                .executes(context -> residentList(context.getSource())));
+        }
+
+        private static int residentList(CommandSourceStack source) {
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                if (data.getResidents().isEmpty()) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.resident.none"), false);
+                        return 0;
+                }
+                for (int index = 0; index < data.getResidents().size(); index++) {
+                        final int residentIndex = index + 1;
+                        ResidentRecord resident = data.getResidents().get(index);
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.resident.entry",
+                                residentIndex,
+                                resident.residentId(),
+                                resident.entityUuid(),
+                                resident.colonyId().isBlank() ? "-" : resident.colonyId(),
+                                resident.homeBuildingKey().isBlank() ? "-" : resident.homeBuildingKey(),
+                                resident.workBuildingKey().isBlank() ? "-" : resident.workBuildingKey(),
+                                resident.role().isBlank() ? "-" : resident.role(),
+                                resident.bodyType(),
+                                resident.lifecycle(),
+                                resident.name().isBlank() ? "-" : resident.name()), false);
+                }
+                return data.getResidents().size();
         }
 
         private static LiteralArgumentBuilder<CommandSourceStack> simulateCommand() {
@@ -723,10 +756,21 @@ public final class CivilizationCommands {
                         }
                 }
 
-                BuildingObservation replacement = BuildingFunction.RESIDENCE.id().equals(building.functionId())
+                                BuildingObservation replacement = BuildingFunction.RESIDENCE.id().equals(building.functionId())
                         ? building.withAddedResident(villager.getUUID(), villager.getName().getString())
                         : building.withResident(villager.getUUID(), villager.getName().getString());
                 if (!data.replaceBuilding(building, replacement)) {
+
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.save_failed"), false);
+                                                return 0;
+                }
+                ResidentRecord resident = data.ensureResidentAssignment(
+                        replacement,
+                        villager.getUUID(),
+                        villager.getName().getString(),
+                        source.getServer().getTickCount());
+                if (resident == null) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.save_failed"), false);
                         return 0;
@@ -734,6 +778,7 @@ public final class CivilizationCommands {
                 BuildingResidentService.applyAssignmentVisual(villager, replacement.functionId());
                 source.sendSuccess(() -> CivilizationMessages.translatable(
                         "civilizationmod.command.assign.success",
+
                         index,
                         villager.getName(),
                         villager.getStringUUID()), false);
@@ -794,6 +839,7 @@ public final class CivilizationCommands {
                                 "civilizationmod.command.assign.save_failed"), false);
                         return 0;
                 }
+                data.clearResidentAssignment(villager.getUUID(), source.getServer().getTickCount());
                 if (data.findBuildingAssignedTo(villager.getStringUUID()) == null) {
                         BuildingRoleEquipment.clearIfCivitasRole(villager);
                 }

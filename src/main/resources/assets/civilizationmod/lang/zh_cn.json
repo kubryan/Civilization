@@ -171,5 +171,7 @@
   "civilizationmod.item.marker.territory.unconfigured": "建築領地：尚未完成",
   "civilizationmod.item.residential_marker.capacity": "住宅容量：%1$d 張床",
   "civilizationmod.villager.backpack.title": "村民背包",
-  "civilizationmod.villager.backpack.player_inventory": "玩家物品欄"
+  "civilizationmod.villager.backpack.player_inventory": "玩家物品欄",
+  "civilizationmod.command.resident.none": "目前沒有已登記的 Civitas 居民。",
+  "civilizationmod.command.resident.entry": "居民 #%1$d：residentId=%2$s，body UUID=%3$s，殖民地=%4$s，住宅=%5$s，工作=%6$s，角色=%7$s，身體=%8$s，生命週期=%9$s，名稱=%10$s"
 }
