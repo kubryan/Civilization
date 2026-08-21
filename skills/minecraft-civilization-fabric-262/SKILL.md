@@ -560,3 +560,12 @@ Civitas 目前不立即新增自訂 Entity。先完成 Town Hall colony ownershi
 不得在 chunk unload 時清除 entityUuid；lookup 找不到可能只是 body 未載入。只有 server 驗證的死亡、移除或 rebind 才能改 entityUuid／lifecycle。第一版不自動復活死亡原版村民。SavedData 保存 ResidentRecord canonical list／Codec，`byResidentId` 與 `byEntityUuid` 是載入後重建的 runtime indexes，不是第二個可修改的真相來源。建築關係應使用 dimension + marker coordinates 或未來 immutable building ID，不得保存易變的 one-based scan index。
 
 本機 Minecraft 26.2 common jar javap 確認 `Entity.getUUID()`、`Entity.setUUID(UUID)` 與 `ServerLevel.getEntityInAnyDimension(UUID)`；未確認 `level.getEntity(UUID)`，`EntityGetter` 公開的是空間 `getEntities(...)` 與 `getPlayerByUUID(UUID)`。禁止把附件中的 `level.getEntity(entityUuid)` 當作 26.2 API。
+
+
+## 已查證：Civitas 自動化測試分層（2026-08-21）
+
+Fabric 官方 [Automated Testing 26.2](https://docs.fabricmc.net/develop/automatic-testing) 將測試分為 Fabric Loader JUnit unit tests 與 Minecraft GameTest；JUnit 測試 helper、model、Codec 與 server-independent invariants，GameTest 啟動實際 Minecraft server/client 驗證 gameplay。
+
+JUnit 設定採 `testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"` 與 `test { useJUnitPlatform() }`。測試若觸及 registry-dependent 類別，`@BeforeAll` 必須先呼叫 `SharedConstants.tryDetectVersion()` 與 `Bootstrap.bootStrap()`。本專案保留相容的 `runFoodModelRegressionTest` JavaExec，另以 `CivitasCoreTest` 納入 JUnit；Gradle `check` 依賴既有 regression task，因此 `build` 會同時執行兩層 common-side 回歸檢查。
+
+第一批 JUnit 覆蓋 FoodDemandModel、SettlementAdapter 去重與狀態保留、BuildingObservation roster／Codec、building 維度與範圍綁定、WarehouseTerritory 邊界、Town Hall 唯一性與 Codec。ItemFrame 真實掃描、SavedData reload、居民互動、背包／物流與 client renderer 留待 GameTest；不要把 client-only renderer 測試放入 common `src/test/java`，未建立 Loom GameTest source set 且未實際執行前，不得宣稱 server/client gameplay 已覆蓋。

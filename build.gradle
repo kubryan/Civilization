@@ -34,7 +34,10 @@ dependencies {
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+		implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// Fabric Loader JUnit is required because Minecraft classes need Fabric's test bootstrap.
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+
 }
 
 processResources {
@@ -62,7 +65,15 @@ tasks.register('runFoodModelRegressionTest', JavaExec) {
 }
 
 tasks.named('test') {
+	useJUnitPlatform()
 	failOnNoDiscoveredTests = false
+	testLogging {
+		events "passed", "failed", "skipped"
+	}
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('runFoodModelRegressionTest')
 }
 
 java {

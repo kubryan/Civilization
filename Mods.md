@@ -3813,3 +3813,67 @@ Entity entity = level.getEntity(entityUuid);
 - [1] https://docs.fabricmc.net/develop/entities/first-entity — Fabric Creating Your First Entity 26.2。
 - [2] https://docs.fabricmc.net/develop/saved-data — Fabric Saved Data。
 - [3] 本機 Minecraft 26.2 common jar `javap`：`Entity`、`ServerLevel`、`ServerEntityGetter`、`EntityGetter`，JDK 25，查證日期 2026-08-21。
+
+
+## 2026-08-21 — Civitas 自動化單元測試第一批
+
+### 變更
+
+本次將原本只有 `FoodModelRegressionTest` main-based regression 的測試架構，擴充為 Fabric Loader JUnit 5 自動化測試。新增 `CivitasCoreTest`，使用 Fabric 官方 26.2 建議的 registry bootstrap，將 common-side 的核心規則納入 Gradle `test` 與 `build`。
+
+測試分層採用兩階段策略：Fabric Loader JUnit 測試純邏輯、Codec 與 server-independent invariants；Minecraft GameTest 日後再測試真實 ServerLevel、ItemFrame、SavedData reload、居民互動、背包、物流與 client renderer。這次沒有假稱 GameTest 已完成。
+
+### 目前自動化覆蓋
+
+| 測試類別 | 驗證內容 |
+|---|---|
+| `FoodDemandModel` | 食物需求、短缺、盈餘、穩定度與事件結果可重現。 |
+| `SettlementAdapter`／`CivilizationWorldData` | 聚落座標漂移去重、不同來源與遠距離聚落區分，且重複 scan 不重置既有食物／債務／穩定度。 |
+| `BuildingObservation` | marker 維度與座標身份、住宅 roster 新增與去重、重掃保留居民、Codec round-trip、legacy single-resident compatibility。 |
+| 建築與聚落綁定 | warehouse 維度、水平／垂直範圍與超出範圍未綁定。 |
+| `WarehouseTerritory` | X/Y/Z inclusive bounds 與相等比較。 |
+| `TownHallCore`／`CivilizationWorldData` | 同一維度核心註冊冪等、第二核心衝突、不同維度可註冊、半徑預設值與 Codec round-trip。 |
+
+### API 查證
+
+Fabric 官方 [Automated Testing 26.2](https://docs.fabricmc.net/develop/automatic-testing) 確認 Fabric Loader JUnit 使用：
+
+```text
+testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+test { useJUnitPlatform() }
+```
+
+同一份官方文件確認 registry-dependent test 在 `@BeforeAll` 先呼叫 `SharedConstants.tryDetectVersion()` 與 `Bootstrap.bootStrap()`；GameTest 則使用 Loom `configureTests` source set 與 `fabric-gametest` entrypoint。本次只採用已查證的 JUnit 路線，沒有猜測 GameTest 設定或新增未驗證的 game test source set。
+
+### 影響檔案
+
+- `build.gradle`：加入 Fabric Loader JUnit test dependency、`useJUnitPlatform()`、test logging，並讓 `check` 依賴既有 `runFoodModelRegressionTest`。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增六個 JUnit 5 common-side 測試案例。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：記錄 JUnit／GameTest 分層、bootstrap 與覆蓋邊界。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步測試規則。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域測試規則。
+- `Mods.md`：追加本次測試內容、命令、結果、風險與下一步。
+
+### 驗證結果
+
+| 命令 | 結果 |
+|---|---|
+| `gradlew.bat --no-daemon test --console=plain` | 第一次執行發現測試預期值錯誤：短缺穩定度實際為 95，修正測試預期後再次執行 `BUILD SUCCESSFUL`；`CivitasCoreTest` 六個案例全部通過。 |
+| `gradlew.bat --no-daemon build --console=plain` | `FoodModelRegressionTest: PASS`；JUnit test 通過；`check`、jar、assemble 與完整 `build` 均 `BUILD SUCCESSFUL`。 |
+| JUnit report | `CivitasCoreTest`：6 tests、0 failures、0 errors。 |
+| `git diff --check` | 無 whitespace error；Windows Git 只提示 LF／CRLF 轉換警告。 |
+
+### 未完成與風險
+
+目前 JUnit 測試不會啟動真實 Minecraft server，因此尚未驗證 ItemFrame 掃描、Town Hall marker 在實際 ServerLevel 的登記、SavedData 重開載入、原版村民互動、27 格背包、warehouse 物流與 client GUI／renderer。這些必須使用 Fabric 26.2 GameTest 或遊戲內人工驗收，不應由純 JUnit 測試假裝覆蓋。
+
+現有 `FoodModelRegressionTest` 名稱歷史上雖然只叫 FoodModel，實際已包含多個文明核心回歸檢查；本次保留它作相容入口，並由 `check` 自動執行。未來若測試規模增加，可以再將其拆成多個 JUnit class，但不要在拆分時刪除既有回歸案例。
+
+### 下一步
+
+先繼續完成 Town Hall `colony_id` 歸屬切片；接著建立 ResidentRecord 後，為 resident migration、UUID lookup、重開 SavedData round-trip 與 duplicate assignment 新增 JUnit。等 common 資料層穩定，再建立獨立 Fabric GameTest source set，測試 ItemFrame、SavedData reload、住宅容量與 warehouse 入庫閉環。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/automatic-testing — Fabric Automated Testing 26.2。
+- [2] https://docs.gradle.org/current/userguide/java_testing.html — Gradle Java Testing。

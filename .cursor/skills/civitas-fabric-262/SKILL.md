@@ -409,6 +409,15 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 查證：本機 Minecraft 26.2 common jar `javap`，JDK 25；日期 2026-08-21。
 
 
+## 2026-08-21 — Civitas 自動化測試分層
+
+- Fabric 官方 [Automated Testing 26.2](https://docs.fabricmc.net/develop/automatic-testing) 將測試分為 Fabric Loader JUnit unit tests 與 Minecraft GameTest；JUnit 測試 helper、model、Codec 與 server-independent invariants，GameTest 啟動實際 Minecraft server/client 驗證 gameplay。
+- JUnit 設定採 `testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"` 與 `test { useJUnitPlatform() }`。測試若觸及 registry-dependent 類別，`@BeforeAll` 必須先呼叫 `SharedConstants.tryDetectVersion()` 與 `Bootstrap.bootStrap()`。
+- 本專案保留相容的 `runFoodModelRegressionTest` JavaExec，另以 `CivitasCoreTest` 納入 JUnit；Gradle `check` 依賴既有 regression task，因此 `build` 會同時執行兩層 common-side 回歸檢查。
+- 第一批 JUnit 覆蓋 FoodDemandModel、SettlementAdapter 去重與狀態保留、BuildingObservation roster／Codec、building 維度與範圍綁定、WarehouseTerritory 邊界、Town Hall 唯一性與 Codec。ItemFrame 真實掃描、SavedData reload、居民互動、背包／物流與 client renderer 留待 GameTest。
+- 不要把 client-only renderer 測試放入 common `src/test/java`；未建立 Loom GameTest source set 且未實際執行前，不得宣稱 server/client gameplay 已覆蓋。
+
+
 ## 2026-08-21 — 市政廳 marker 視覺 prototype 與功能分層
 
 - 任務：建立市政廳 marker 的方塊式 item model 與獨立材質。

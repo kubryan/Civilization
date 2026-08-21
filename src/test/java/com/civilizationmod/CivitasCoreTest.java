@@ -1,0 +1,223 @@
+package com.civilizationmod;
+
+import com.mojang.serialization.JsonOps;
+import net.minecraft.SharedConstants;
+import net.minecraft.server.Bootstrap;
+import net.minecraft.core.BlockPos;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class CivitasCoreTest {
+    private static final UUID RESIDENT_ONE = UUID.fromString("123e4567-e89b-12d3-a456-426614174101");
+    private static final UUID RESIDENT_TWO = UUID.fromString("123e4567-e89b-12d3-a456-426614174102");
+
+    @BeforeAll
+    static void bootstrapMinecraftRegistries() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+    }
+
+    @Test
+    void foodDemandShortageAndSurplusRemainDeterministic() {
+        FoodDemandModel.Result shortage = FoodDemandModel.simulate(settlement(0L, 0, 100));
+        assertEquals(20L, shortage.demand());
+        assertEquals(0L, shortage.consumed());
+        assertEquals(0L, shortage.settlement().foodStock());
+        assertEquals(20, shortage.settlement().stabilityDebt());
+        assertEquals(95, shortage.settlement().stability());
+        assertEquals(FoodDemandModel.EVENT_SHORTAGE, shortage.settlement().lastFoodEvent());
+
+        FoodDemandModel.Result surplus = FoodDemandModel.simulate(settlement(100L, 5, 99));
+        assertEquals(80L, surplus.settlement().foodStock());
+        assertEquals(4, surplus.settlement().stabilityDebt());
+        assertEquals(100, surplus.settlement().stability());
+        assertEquals(FoodDemandModel.EVENT_SURPLUS, surplus.settlement().lastFoodEvent());
+    }
+
+    @Test
+    void settlementDeduplicationPreservesExistingSimulationState() {
+        CivilizationWorldData data = new CivilizationWorldData();
+        SettlementAdapter existing = settlementAt("test:village", 0, 64, 0, 17L, 42, 73);
+        assertTrue(data.addSettlement(existing));
+
+        SettlementAdapter driftedScan = settlementAt("test:village", 48, 64, 32, 100L, 0, 100);
+        assertFalse(data.addSettlement(driftedScan));
+        assertEquals(1, data.getSettlementCount());
+        assertEquals(17L, data.getSettlement(1).foodStock());
+        assertEquals(42, data.getSettlement(1).stabilityDebt());
+        assertEquals(73, data.getSettlement(1).stability());
+
+        assertTrue(data.addSettlement(settlementAt("other:village", 48, 64, 32, 100L, 0, 100)));
+        assertTrue(data.addSettlement(settlementAt("test:village", 65, 64, 0, 100L, 0, 100)));
+        assertEquals(3, data.getSettlementCount());
+    }
+
+    @Test
+    void buildingObservationPreservesResidentRosterAcrossRefreshAndCodec() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                10,
+                64,
+                20,
+                BuildingObservation.STATUS_BOUND,
+                100L,
+                100L,
+                "minecraft:overworld",
+                0,
+                64,
+                0
+        ).withResidenceMeasurements(2, 2);
+
+        BuildingObservation assigned = residence
+                .withAddedResident(RESIDENT_ONE, "Resident One")
+                .withAddedResident(RESIDENT_TWO, "Resident Two")
+                .withAddedResident(RESIDENT_TWO, "Duplicate Resident");
+
+        assertEquals(2, assigned.residentCount());
+        assertTrue(assigned.hasResident(RESIDENT_ONE));
+        assertTrue(assigned.hasResident(RESIDENT_TWO));
+
+        BuildingObservation refreshed = assigned.refreshed(
+                BuildingFunction.RESIDENCE.id(),
+                200L,
+                BuildingObservation.STATUS_BOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                "minecraft:overworld",
+                0,
+                64,
+                0,
+                2,
+                2,
+                BuildingStorageSnapshot.unscanned());
+        assertEquals(2, refreshed.residentCount());
+        assertEquals("Resident Two", refreshed.residents().get(1).name());
+
+        var encoded = BuildingObservation.CODEC.encodeStart(JsonOps.INSTANCE, assigned).getOrThrow();
+        BuildingObservation decoded = BuildingObservation.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertEquals(2, decoded.residentCount());
+        assertEquals("Resident Two", decoded.residents().get(1).name());
+        assertEquals(1, residence.withResident(RESIDENT_ONE, "Legacy Resident").residentCount());
+    }
+
+    @Test
+    void buildingIdentityAndSettlementBindingRespectDimensionAndRange() {
+        BuildingObservation observation = new BuildingObservation(
+                BuildingFunction.WAREHOUSE.id(),
+                "minecraft:overworld",
+                10,
+                64,
+                20,
+                BuildingObservation.STATUS_UNBOUND,
+                100L,
+                100L,
+                "",
+                0,
+                0,
+                0);
+        assertTrue(observation.isSameMarker("minecraft:overworld", 10, 64, 20));
+        assertFalse(observation.isSameMarker("minecraft:the_nether", 10, 64, 20));
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addSettlement(settlementAt("test:village", 0, 64, 0, 55L, 0, 100)));
+        assertNotNull(data.findSettlementForBuilding("minecraft:overworld", 64, 64, 64));
+        assertNull(data.findSettlementForBuilding("minecraft:overworld", 129, 64, 0));
+        assertNull(data.findSettlementForBuilding("minecraft:the_nether", 0, 64, 0));
+    }
+
+    @Test
+    void territoryBoundsAreInclusiveAndComparable() {
+        WarehouseTerritory territory = new WarehouseTerritory(
+                1,
+                "minecraft:overworld",
+                4,
+                64,
+                30,
+                10,
+                70,
+                36);
+        assertEquals(4, territory.minX());
+        assertEquals(10, territory.maxX());
+        assertEquals(64, territory.minY());
+        assertEquals(70, territory.maxY());
+        assertTrue(territory.contains(new BlockPos(7, 67, 33)));
+        assertFalse(territory.contains(new BlockPos(3, 67, 33)));
+        assertEquals(territory, new WarehouseTerritory(
+                1,
+                "minecraft:overworld",
+                4,
+                64,
+                30,
+                10,
+                70,
+                36));
+    }
+
+    @Test
+    void townHallIsIdempotentPerDimensionAndCodecCompatible() {
+        CivilizationWorldData data = new CivilizationWorldData();
+        BlockPos firstMarker = new BlockPos(100, 70, -40);
+
+        CivilizationWorldData.TownHallRegistration registered = data.registerTownHall(
+                "minecraft:overworld", firstMarker, 1234L);
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED, registered.status());
+
+        TownHallCore core = data.getTownHallCore("minecraft:overworld");
+        assertNotNull(core);
+        assertTrue(core.isSameMarker("minecraft:overworld", firstMarker));
+        assertEquals(1234L, core.createdAt());
+        assertEquals(TownHallCore.DEFAULT_RADIUS, core.radius());
+
+        CivilizationWorldData.TownHallRegistration same = data.registerTownHall(
+                "minecraft:overworld", firstMarker, 9999L);
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.EXISTING, same.status());
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.DUPLICATE, data.registerTownHall(
+                "minecraft:overworld", firstMarker.offset(10, 0, 10), 9999L).status());
+        assertSame(CivilizationWorldData.TownHallRegistrationStatus.REGISTERED, data.registerTownHall(
+                "minecraft:the_nether", firstMarker, 2222L).status());
+        assertEquals(2, data.getTownHallCoreCount());
+
+        var encoded = TownHallCore.CODEC.encodeStart(JsonOps.INSTANCE, core).getOrThrow();
+        TownHallCore decoded = TownHallCore.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertEquals(core, decoded);
+    }
+
+    private static SettlementAdapter settlement(long foodStock, int stabilityDebt, int stability) {
+        return settlementAt("test:village", 0, 64, 0, foodStock, stabilityDebt, stability);
+    }
+
+    private static SettlementAdapter settlementAt(
+            String source,
+            int centerX,
+            int centerY,
+            int centerZ,
+            long foodStock,
+            int stabilityDebt,
+            int stability
+    ) {
+        return new SettlementAdapter(
+                source,
+                "minecraft:overworld",
+                centerX,
+                centerY,
+                centerZ,
+                0L,
+                "test",
+                20,
+                foodStock,
+                1,
+                stabilityDebt,
+                stability,
+                FoodDemandModel.EVENT_STABLE);
+    }
+}
