@@ -3170,3 +3170,56 @@ building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已
 ### 下一步
 
 在遊戲內建立四種住宅 marker，分別放入有對應床位數的領地，先執行 `/civitas building scan`，再使用 `/civitas assign <building_index> [villager]` 依序測試容量上限與超額拒絕。驗收完成後再設計 unassign／居民搬遷與市政廳居民上限管理。
+
+
+## 2026-08-21 — Residential Marker 1／2／4／6 材質與模型視覺更新
+
+### 變更
+
+重新設計四個不同容量住宅 marker 的遊戲內材質，使它們維持同一套 Civitas 住宅識別語言，但能在物品欄與展示框中快速區分容量。四個圖示共同採用側視床輪廓、深色木製床架、白色枕頭與清楚的金色容量數字；床墊色彩依容量分級：1 床為深紅色、2 床為皇家藍、4 床為翠綠色、6 床為深紫色。住宅圖示不使用 warehouse 的箱子／容器輪廓，因此不會與倉庫標誌混淆。
+
+每個容量版本維持獨立 PNG 與獨立 item model layer0：`residential_marker_1`、`residential_marker_2`、`residential_marker_4`、`residential_marker_6`。模型沿用 Minecraft `item/generated`，不增加未查證的 model override、renderer 或 client-only model loader；視覺差異由各自材質提供，維持簡單可靠的 common resource asset chain。
+
+### 影響檔案
+
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_1.png`：更新 1 床住宅材質。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_2.png`：更新 2 床住宅材質。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_4.png`：更新 4 床住宅材質。
+- `src/main/resources/assets/civilizationmod/textures/item/residential_marker_6.png`：更新 6 床住宅材質。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_1.json`：確認 layer0 指向 1 床專用材質，未需改動。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_2.json`：確認 layer0 指向 2 床專用材質，未需改動。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_4.json`：確認 layer0 指向 4 床專用材質，未需改動。
+- `src/main/resources/assets/civilizationmod/models/item/residential_marker_6.json`：確認 layer0 指向 6 床專用材質，未需改動。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加住宅材質與模型資產規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步住宅材質與模型資產規則。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域可重用資產規則。
+- `Mods.md`：追加本次材質更新記錄。
+
+### 資產規格與查證
+
+| 資產 | PNG 尺寸 | 色彩型態 | 主要辨識元素 | 模型 layer0 |
+|---|---:|---|---|---|
+| `residential_marker_1.png` | 16×16 | RGBA，color type 6 | 深紅床墊、金色數字 1 | `civilizationmod:item/residential_marker_1` |
+| `residential_marker_2.png` | 16×16 | RGBA，color type 6 | 皇家藍床墊、金色數字 2 | `civilizationmod:item/residential_marker_2` |
+| `residential_marker_4.png` | 16×16 | RGBA，color type 6 | 翠綠床墊、金色數字 4 | `civilizationmod:item/residential_marker_4` |
+| `residential_marker_6.png` | 16×16 | RGBA，color type 6 | 深紫床墊、金色數字 6 | `civilizationmod:item/residential_marker_6` |
+
+所有正式 PNG 均保留一像素透明外框，四角 alpha 為 0；這能避免生成圖的背景或床腳貼到 item icon 邊界。圖示先以 AI 生成統一風格概念，再以最近鄰縮放為 Minecraft 16×16 RGBA 貼圖；沒有使用其他受版權保護的資源包素材。
+
+### 查證與驗證
+
+| 命令／檢查 | 結果 |
+|---|---|
+| 正式 PNG IHDR 與 alpha 檢查 | 四個檔案均為 `16×16`、RGBA color type `6`，四角 alpha 均為 0。 |
+| item model JSON 檢查 | 四個 model 均使用 `minecraft:item/generated`，並各自指向專用 layer0。 |
+| `git diff --check` | 通過，沒有 whitespace error。一次性資產驗證腳本已刪除，未留在 repository。 |
+| `gradlew.bat --no-daemon clean build --console=plain` | `BUILD SUCCESSFUL`；common、client、resources、jar、assemble 與 build 均通過。 |
+| `gradlew.bat --no-daemon runClient --console=plain` | Fabric loader、Render thread、texture atlas、resource reload 與 client initialization 成功；完成 smoke test 後已主動停止持續執行的 client。Realms 授權訊息屬開發環境服務，不是材質載入錯誤。 |
+
+### 未完成與風險
+
+目前已完成檔案層級與 client 啟動驗證，尚未在實際遊戲 GUI 中逐一截圖確認四個 icon 在不同 GUI 縮放設定下的最終觀感。由於 16×16 圖示本身解析度很低，數字辨識會受 GUI scale 與玩家顯示器影響；若遊戲內觀感需要調整，下一輪應只針對最不清楚的一個容量數字進行單一局部修正，不重新改動整套色彩系統。
+
+### 下一步
+
+進入遊戲後在創造模式物品欄或以配方取得四種 marker，並將它們放在 ItemFrame 中比較：確認 1／2／4／6 的床墊色彩與金色數字能快速區分，且 warehouse marker 仍維持箱子外觀。之後可再為住宅 marker 增加 tooltip 的容量與即時床位摘要，讓圖示辨識與 server-side 容量規則互相補強。

@@ -339,3 +339,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 `BuildingResidentService` 每 20 server ticks 逐一解析住宅 roster 中的原版 `Villager` UUID 並導航到 marker；warehouse 仍執行原本單一居民的物流入庫。`CivilizationWorldData.findBuildingAssignedTo` 必須按 roster 搜尋，確保住宅多居民右鍵互動仍能找到所屬 building。這次 schema version 升至 6；新增 roster 欄位有 optional default，舊世界可載入。
 
 驗證方式：`runFoodModelRegressionTest` 檢查 roster 新增、重複去重、重掃保留、Codec round-trip 與 legacy single-resident compatibility；`compileJava`、`clean build` 與 `runClient` smoke test 需成功。
+
+
+## 2026-08-21 — 住宅 marker 材質與 item model 資產規則
+
+- 任務：讓 residential marker 1／2／4／6 在遊戲中有獨立且可辨識的視覺。
+- 已確認：每級使用獨立 `16×16` RGBA PNG；item model 使用已驗證的 `minecraft:item/generated`，`textures.layer0` 分別指向對應 `civilizationmod:item/residential_marker_<capacity>`。
+- 採用：共同使用側視床輪廓，容量數字 1／2／4／6 加上階級色彩區分；正式圖示保留一像素透明外框。視覺差異由 PNG 提供，不增加 client renderer 或 model loader。
+- 禁止：住宅 marker 不得重用 warehouse 的箱子／容器紋理，也不要為簡單 item icon 猜測或引入未查證的 model override API。
+- 查證：正式專案四個 PNG 的 IHDR 均為 `16×16`、color type `6` RGBA；四個 model 的 layer0 均指向各自貼圖；`clean build` 與 `runClient` smoke test 通過。日期 2026-08-21。
