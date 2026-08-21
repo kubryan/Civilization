@@ -96,40 +96,42 @@ public final class BuildingResidentService {
                 continue;
             }
 
-            Optional<UUID> residentUuid = building.residentUuidValue();
-            if (residentUuid.isEmpty()) {
-                continue;
-            }
-
             ServerLevel buildingLevel = findLevel(server, building.dimension());
             if (buildingLevel == null) {
                 continue;
             }
 
-            Entity entity = buildingLevel.getEntityInAnyDimension(residentUuid.get());
-            if (!(entity instanceof Villager villager)
-                    || villager.level() != buildingLevel
-                    || !villager.isAlive()) {
-                continue;
-            }
-
-            applyAssignmentVisual(villager, building.functionId());
             BlockPos marker = new BlockPos(building.markerX(), building.markerY(), building.markerZ());
-            if (villager.distanceToSqr(marker.getX() + 0.5D, marker.getY(), marker.getZ() + 0.5D)
-                    > ARRIVAL_DISTANCE_SQUARED) {
-                villager.getNavigation().moveTo(
-                        marker.getX() + 0.5D,
-                        marker.getY(),
-                        marker.getZ() + 0.5D,
-                        MOVE_SPEED);
-            } else if (BuildingFunction.WAREHOUSE.id().equals(building.functionId())) {
-                BuildingLogisticsService.tryDeposit(
-                        server,
-                        data,
-                        index,
-                        building,
-                        buildingLevel,
-                        villager);
+            for (BuildingObservation.ResidentAssignment resident : building.residents()) {
+                Optional<UUID> residentUuid = resident.uuidValue();
+                if (residentUuid.isEmpty()) {
+                    continue;
+                }
+
+                Entity entity = buildingLevel.getEntityInAnyDimension(residentUuid.get());
+                if (!(entity instanceof Villager villager)
+                        || villager.level() != buildingLevel
+                        || !villager.isAlive()) {
+                    continue;
+                }
+
+                applyAssignmentVisual(villager, building.functionId());
+                if (villager.distanceToSqr(marker.getX() + 0.5D, marker.getY(), marker.getZ() + 0.5D)
+                        > ARRIVAL_DISTANCE_SQUARED) {
+                    villager.getNavigation().moveTo(
+                            marker.getX() + 0.5D,
+                            marker.getY(),
+                            marker.getZ() + 0.5D,
+                            MOVE_SPEED);
+                } else if (BuildingFunction.WAREHOUSE.id().equals(building.functionId())) {
+                    BuildingLogisticsService.tryDeposit(
+                            server,
+                            data,
+                            index,
+                            building,
+                            buildingLevel,
+                            villager);
+                }
             }
         }
     }

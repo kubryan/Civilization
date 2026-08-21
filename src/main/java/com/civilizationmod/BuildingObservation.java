@@ -4,6 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,7 +35,8 @@ public record BuildingObservation(
         int bedCount,
         String residentUuid,
         String residentName,
-        BuildingStorageSnapshot storageSnapshot
+        BuildingStorageSnapshot storageSnapshot,
+        List<ResidentAssignment> residents
 ) {
     public static final String STATUS_BOUND = "bound";
     public static final String STATUS_UNBOUND = "unbound";
@@ -54,6 +57,7 @@ public record BuildingObservation(
     public static final String VALIDATION_REASON_NO_ENTRY = "no_entry";
     public static final String VALIDATION_REASON_NO_CONTAINER = "no_container";
     public static final String VALIDATION_REASON_INSUFFICIENT_BEDS = "insufficient_beds";
+    public static final String VALIDATION_REASON_RESIDENTS_OVER_CAPACITY = "residents_over_capacity";
     public static final String VALIDATION_REASON_MARKER_NOT_AT_DOOR = "marker_not_at_door";
     public static final String VALIDATION_REASON_MARKER_AMBIGUOUS = "marker_ambiguous";
     public static final String VALIDATION_REASON_SCAN_LIMIT = "scan_limit";
@@ -64,11 +68,40 @@ public record BuildingObservation(
     public static final String VALIDATION_REASON_MARKER_NOT_ATTACHED = "marker_not_attached";
     public static final String VALIDATION_REASON_DUPLICATE_TERRITORY = "duplicate_territory";
 
+    /** Persisted resident identity; UUID is authoritative and name is diagnostic. */
+    public record ResidentAssignment(String uuid, String name) {
+        public static final Codec<ResidentAssignment> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.STRING.fieldOf("uuid").forGetter(ResidentAssignment::uuid),
+                Codec.STRING.optionalFieldOf("name", "").forGetter(ResidentAssignment::name)
+        ).apply(instance, ResidentAssignment::new));
+
+        public ResidentAssignment {
+            uuid = uuid == null ? "" : uuid;
+            name = name == null ? "" : name;
+        }
+
+        public Optional<UUID> uuidValue() {
+            if (uuid.isBlank()) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(UUID.fromString(uuid));
+            } catch (IllegalArgumentException exception) {
+                return Optional.empty();
+            }
+        }
+
+        public String displayName() {
+            return name.isBlank() ? uuid : name;
+        }
+    }
+
     private record CodecTail(
             int capacity,
             int bedCount,
             String residentName,
-            BuildingStorageSnapshot storageSnapshot
+            BuildingStorageSnapshot storageSnapshot,
+            List<ResidentAssignment> residents
     ) {
     }
 
@@ -77,7 +110,9 @@ public record BuildingObservation(
             Codec.INT.optionalFieldOf("bed_count", 0).forGetter(CodecTail::bedCount),
             Codec.STRING.optionalFieldOf("resident_name", "").forGetter(CodecTail::residentName),
             BuildingStorageSnapshot.CODEC.optionalFieldOf("storage", BuildingStorageSnapshot.unscanned())
-                    .forGetter(CodecTail::storageSnapshot)
+                    .forGetter(CodecTail::storageSnapshot),
+            ResidentAssignment.CODEC.listOf().optionalFieldOf("residents", List.of())
+                    .forGetter(CodecTail::residents)
     ).apply(instance, CodecTail::new));
 
     public static final Codec<BuildingObservation> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -100,7 +135,8 @@ public record BuildingObservation(
                     observation.capacity(),
                     observation.bedCount(),
                     observation.residentName(),
-                    observation.storageSnapshot()))
+                    observation.storageSnapshot(),
+                    observation.residents()))
     ).apply(instance, (functionId, dimension, markerX, markerY, markerZ, status,
                        validationStatus, validationReason, firstSeen, lastSeen,
                        settlementDimension, settlementX, settlementY, settlementZ,
@@ -123,7 +159,8 @@ public record BuildingObservation(
             tail.bedCount(),
             residentUuid,
             tail.residentName(),
-            tail.storageSnapshot())));
+            tail.storageSnapshot(),
+            tail.residents())));
 
     /** Backward-compatible constructor for observations created before geometry validation. */
     public BuildingObservation(
@@ -161,7 +198,8 @@ public record BuildingObservation(
                 0,
                 "",
                 "",
-                BuildingStorageSnapshot.unscanned());
+                BuildingStorageSnapshot.unscanned(),
+                List.of());
     }
 
     public BuildingObservation(
@@ -197,7 +235,8 @@ public record BuildingObservation(
                 0,
                 "",
                 "",
-                BuildingStorageSnapshot.unscanned());
+                BuildingStorageSnapshot.unscanned(),
+                List.of());
     }
 
     public BuildingObservation {
@@ -220,6 +259,11 @@ public record BuildingObservation(
         storageSnapshot = storageSnapshot == null
                 ? BuildingStorageSnapshot.unscanned()
                 : storageSnapshot;
+        residents = normalizeResidents(residents, residentUuid, residentName);
+        if (!residents.isEmpty()) {
+            residentUuid = residents.get(0).uuid();
+            residentName = residents.get(0).name();
+        }
     }
 
     public boolean isSameMarker(String otherDimension, int x, int y, int z) {
@@ -312,11 +356,12 @@ public record BuildingObservation(
                 newBedCount,
                 this.residentUuid,
                 this.residentName,
-                newStorageSnapshot);
+                newStorageSnapshot,
+                this.residents);
     }
 
     public boolean hasResident() {
-        return residentUuidValue().isPresent();
+        return !residents.isEmpty();
     }
 
     public Optional<UUID> residentUuidValue() {
@@ -330,7 +375,91 @@ public record BuildingObservation(
         }
     }
 
+    public int residentCount() {
+        return residents.size();
+    }
+
+    public boolean hasResident(UUID uuid) {
+        return uuid != null && hasResidentUuid(uuid.toString());
+    }
+
+    public boolean hasResidentUuid(String uuid) {
+        if (uuid == null || uuid.isBlank()) {
+            return false;
+        }
+        return residents.stream().anyMatch(resident -> uuid.equals(resident.uuid()));
+    }
+
     public BuildingObservation withResident(UUID uuid, String name) {
+        return withResidents(uuid == null
+                ? List.of()
+                : List.of(new ResidentAssignment(uuid.toString(), name)));
+    }
+
+    public BuildingObservation withAddedResident(UUID uuid, String name) {
+        if (uuid == null || hasResident(uuid)) {
+            return this;
+        }
+        List<ResidentAssignment> updated = new ArrayList<>(this.residents);
+        updated.add(new ResidentAssignment(uuid.toString(), name));
+        return withResidents(updated);
+    }
+
+    public BuildingObservation withValidation(String newValidationStatus, String newValidationReason) {
+        return new BuildingObservation(
+                this.functionId,
+                this.dimension,
+                this.markerX,
+                this.markerY,
+                this.markerZ,
+                this.status,
+                newValidationStatus,
+                newValidationReason,
+                this.firstSeen,
+                this.lastSeen,
+                this.settlementDimension,
+                this.settlementX,
+                this.settlementY,
+                this.settlementZ,
+                this.capacity,
+                this.bedCount,
+                this.residentUuid,
+                this.residentName,
+                this.storageSnapshot,
+                this.residents);
+    }
+
+    public BuildingObservation withResidenceMeasurements(int newCapacity, int newBedCount) {
+        return new BuildingObservation(
+                this.functionId,
+                this.dimension,
+                this.markerX,
+                this.markerY,
+                this.markerZ,
+                this.status,
+                this.validationStatus,
+                this.validationReason,
+                this.firstSeen,
+                this.lastSeen,
+                this.settlementDimension,
+                this.settlementX,
+                this.settlementY,
+                this.settlementZ,
+                newCapacity,
+                newBedCount,
+                this.residentUuid,
+                this.residentName,
+                this.storageSnapshot,
+                this.residents);
+    }
+
+    private BuildingObservation withResidents(List<ResidentAssignment> updatedResidents) {
+        String primaryUuid = updatedResidents == null || updatedResidents.isEmpty()
+                ? ""
+                : updatedResidents.get(0).uuid();
+        String primaryName = updatedResidents == null || updatedResidents.isEmpty()
+                ? ""
+                : updatedResidents.get(0).name();
         return new BuildingObservation(
                 this.functionId,
                 this.dimension,
@@ -348,9 +477,10 @@ public record BuildingObservation(
                 this.settlementZ,
                 this.capacity,
                 this.bedCount,
-                uuid == null ? "" : uuid.toString(),
-                name == null ? "" : name,
-                this.storageSnapshot);
+                primaryUuid,
+                primaryName,
+                this.storageSnapshot,
+                updatedResidents == null ? List.of() : updatedResidents);
     }
 
     public BuildingObservation withoutResident() {
@@ -377,7 +507,32 @@ public record BuildingObservation(
                 this.bedCount,
                 this.residentUuid,
                 this.residentName,
-                snapshot);
+                snapshot,
+                this.residents);
+    }
+
+    private static List<ResidentAssignment> normalizeResidents(
+            List<ResidentAssignment> values,
+            String legacyUuid,
+            String legacyName
+    ) {
+        List<ResidentAssignment> normalized = new ArrayList<>();
+        addResidentIfValid(normalized, new ResidentAssignment(legacyUuid, legacyName));
+        if (values != null) {
+            for (ResidentAssignment value : values) {
+                addResidentIfValid(normalized, value);
+            }
+        }
+        return List.copyOf(normalized);
+    }
+
+    private static void addResidentIfValid(List<ResidentAssignment> residents, ResidentAssignment candidate) {
+        if (candidate == null || candidate.uuidValue().isEmpty()) {
+            return;
+        }
+        if (residents.stream().noneMatch(existing -> existing.uuid().equals(candidate.uuid()))) {
+            residents.add(candidate);
+        }
     }
 
     private static String normalizeValidationStatus(String value) {
@@ -390,4 +545,3 @@ public record BuildingObservation(
         return VALIDATION_DETECTED;
     }
 }
-

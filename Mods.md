@@ -3117,3 +3117,56 @@ README 修改為文件內容，沒有新增 Minecraft API 或 Java 程式碼，�
 ### 來源
 
 - [1] [Fabric Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes)
+
+
+## 2026-08-21 — Residential Marker 村民與床位容量檢查
+
+### 變更
+
+完成住宅 marker 的 server-side 容量閉環。住宅 marker 的 `capacity` 由 `BuildingMarkerRegistry` 的 1／2／4／6 定義提供；`ResidenceValidator` 繼續以領地內原版床的 block state 計算 `bedCount`，只有 `bedCount >= capacity` 才能保持住宅有效。
+
+`BuildingObservation` 現在保存可向後相容的多居民 roster。舊版 `resident_uuid`／`resident_name` 仍保留，載入舊世界時會自動正規化為 roster 第一名；新居民以 `ResidentAssignment` 保存 UUID 與診斷名稱，重複 UUID 不會重複加入。住宅重掃、storage snapshot 更新與 validation 更新都會保留既有 roster，不會因重新執行 building scan 而清除已指派村民。
+
+`/civitas assign <building_index> [villager]` 對住宅加入即時 server gate：指派前重新找目前載入的 marker ItemFrame、讀取領地資料並重新計算床位；marker／領地缺失或床位不足時拒絕。若同一村民已經在目標住宅，操作維持冪等；若住宅 roster 已達 marker capacity，會回傳住宅已滿訊息並拒絕新的村民。warehouse 仍維持原本的單一居民與物流行為。
+
+building scan 會檢查保存的住宅 roster。若 marker 目前容量低於已保存居民數，資料不會被刪除，但 observation 會標記為 `invalid`、reason=`residents_over_capacity`，並移除 marker 的有效 glint；玩家可換回更高容量 marker 或調整居民資料後重新掃描。`/civitas building list` 與 `inspect` 現在顯示床位需求、實際居民數、居民容量及居民名單。
+
+`BuildingResidentService` 每 20 server ticks 逐一解析住宅 roster 中的原版村民 UUID 並導航到 marker；warehouse 的單居民導航與自動入庫分支未改變。SavedData schema version 升至 6，新增 roster 使用 nested optional Codec 欄位以保持舊世界相容。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/BuildingObservation.java`：新增 `ResidentAssignment`、optional roster Codec、居民查詢／追加／validation／容量 helper，保留 legacy single-resident 欄位。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：schema 升至 6；新增 marker ItemFrame 查找；building scan 將 roster 超容量住宅標記 invalid；assigned lookup 改查 roster。
+- `src/main/java/com/civilizationmod/ResidenceValidator.java`：公開已查證的領地床位計數 helper，供 assign 即時重驗證。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：加入住宅即時床位檢查、滿額拒絕與多居民 inspect 顯示。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：逐一導航住宅 roster，保留 warehouse 單居民物流。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增住宅已滿、超容量、居民 roster 與多居民摘要翻譯。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：新增住宅已滿、超容量、居民 roster 與多居民摘要翻譯。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策使用繁體中文同步新增上述翻譯。
+- `src/test/java/com/civilizationmod/FoodModelRegressionTest.java`：新增多居民 roster、重複 UUID、重掃保留、Codec round-trip 與舊單居民相容測試。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加住宅容量與 roster 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：追加住宅容量與 roster 規則。
+- `/home/ubuntu/skills/minecraft-civilization-fabric-262/SKILL.md`：同步全域可重用 skill 規則。
+- `Mods.md`：追加本次住宅容量功能記錄。
+
+### 查證與驗證
+
+| 項目 | 結果 |
+|---|---|
+| 版本 | Minecraft `26.2`、Fabric Loader `0.19.3`、Fabric API `0.158.0+26.2`、Loom `1.17.19`、Java `25`。 |
+| 26.2 API 依據 | ItemFrame entity query、`ServerLevel.getEntities(EntityTypeTest, AABB, Predicate)`、Villager UUID／navigation 與既有 server tick API 均沿用專案已查證的 Minecraft 26.2 common jar 與 Fabric lifecycle API。新增 roster Codec 沿用既有 `RecordCodecBuilder` 與 `listOf().optionalFieldOf` 模式。 |
+| `gradlew.bat --no-daemon compileJava --console=plain` | 最終 `BUILD SUCCESSFUL`。中途的 lambda capture 錯誤已修正，未保留未編譯程式。 |
+| `gradlew.bat --no-daemon clean build --console=plain` | 最終 `BUILD SUCCESSFUL`；common、client、resources、jar、sourcesJar、check 與 assemble 通過。 |
+| `gradlew.bat --no-daemon runFoodModelRegressionTest --console=plain` | `FoodModelRegressionTest: PASS`；包含新增住宅 roster 與 Codec 回歸檢查。 |
+| `gradlew.bat --no-daemon runClient --console=plain` | Render thread、Fabric loader、resource reload、texture atlas 與 client initialization 成功；已主動停止持續執行的 client。Realms／帳號授權訊息仍屬開發環境服務，不是本模組錯誤。 |
+| `git diff --check` | 沒有 whitespace error；只有既有 LF／CRLF 跨平台提示。 |
+
+### 未完成與風險
+
+目前已完成 server-side 資料模型、容量 gate、重掃 invalid 判定、保存相容與自動導航；尚未在實際 Minecraft 世界中手動指派 1／2／4／6 名村民完成完整互動驗收。遊戲內驗收仍需確認：2 床住宅能成功指派第二名村民、第三名被拒絕；4 床與 6 床依序接受不超過 marker 容量的村民；床位不足或 marker 降級時 building scan 顯示 invalid；世界重開後 roster 仍存在。
+
+目前沒有新增 unassign 指令，因此若玩家要釋放住宅容量，下一個切片需要設計 server-side unassign／搬遷規則；本次不會透過刪除 SavedData 或自動移除村民來繞過容量限制。
+
+### 下一步
+
+在遊戲內建立四種住宅 marker，分別放入有對應床位數的領地，先執行 `/civitas building scan`，再使用 `/civitas assign <building_index> [villager]` 依序測試容量上限與超額拒絕。驗收完成後再設計 unassign／居民搬遷與市政廳居民上限管理。

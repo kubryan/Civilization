@@ -22,7 +22,9 @@
   "civilizationmod.command.building.scan.result": "建築掃描半徑 %1$d：偵測到 %2$d 個，更新 %3$d 個，已綁定聚落 %4$d 個，有效=%5$d 個，無效=%6$d 個。",
   "civilizationmod.command.building.entry": "建築 #%1$d：功能=%2$s，標識位置=%3$s（%4$d，%5$d，%6$d），聚落=%7$s，綁定=%8$s，驗證=%9$s，原因=%10$s，指派村民=%11$s，住宅資料=%12$s，首次觀測=%13$d，最近觀測=%14$d，儲存=%15$s",
   "civilizationmod.command.assign.invalid_building": "建築編號 %1$d 無效。目前已觀測建築：%2$d 座。",
-  "civilizationmod.command.assign.building_not_valid": "建築 #%1$d 目前不是有效建築，不能指派村民（%2$s）。",
+    "civilizationmod.command.assign.building_not_valid": "建築 #%1$d 目前不是有效建築，不能指派村民（%2$s）。",
+  "civilizationmod.command.assign.residence_full": "住宅 #%1$d 已達容量：居民=%2$d／容量=%3$d。",
+
   "civilizationmod.command.assign.requires_player": "這種 assign 用法必須由玩家執行。",
   "civilizationmod.command.assign.villager_not_found": "在有效距離內沒有你正在注視的存活村民。",
   "civilizationmod.command.assign.target_not_villager": "選取的實體不是原版村民。",
@@ -50,7 +52,9 @@
   "civilizationmod.building.validation.reason.no_walls": "門以外的一面或多面牆壁有空氣缺口",
   "civilizationmod.building.validation.reason.no_entry": "無法從門進入房屋內部",
   "civilizationmod.building.validation.reason.no_container": "倉庫內沒有箱子",
-  "civilizationmod.building.validation.reason.insufficient_beds": "住宅床位不足，無法滿足此標誌的容量",
+    "civilizationmod.building.validation.reason.insufficient_beds": "住宅床位不足，無法滿足此標誌的容量",
+  "civilizationmod.building.validation.reason.residents_over_capacity": "住宅已指派超過此標誌允許數量的村民",
+
   "civilizationmod.command.building.generate.failure.invalid_context": "無效的命令上下文",
   "civilizationmod.command.building.generate.failure.unloaded": "目標範圍尚未載入",
   "civilizationmod.command.building.generate.failure.existing_item_frame": "測試範圍內已經有物品展示框",
@@ -64,9 +68,13 @@
   "civilizationmod.building.binding.index": "聚落 #%1$d",
   "civilizationmod.building.binding.unbound": "未綁定",
   "civilizationmod.building.resident.unassigned": "尚未指派",
-  "civilizationmod.building.resident.assigned": "%1$s（%2$s）",
+    "civilizationmod.building.resident.assigned": "%1$s（%2$s）",
+  "civilizationmod.building.resident.capacity": "居民=%1$d／容量=%2$d：%3$s",
+  "civilizationmod.building.resident.separator": "、",
+
   "civilizationmod.building.residence.not_applicable": "不適用",
-  "civilizationmod.building.residence.summary": "床位=%1$d／容量=%2$d",
+    "civilizationmod.building.residence.summary": "床位=%1$d／需求=%2$d，居民=%3$d／容量=%4$d",
+
   "civilizationmod.building.storage.unscanned": "尚未掃描箱子",
   "civilizationmod.building.storage.empty": "空",
   "civilizationmod.building.storage.item": "%1$s x%2$d",

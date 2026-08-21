@@ -26,7 +26,7 @@ import java.util.Set;
  * client.</p>
  */
 public final class CivilizationWorldData extends SavedData {
-    private static final int CURRENT_SCHEMA_VERSION = 5;
+    private static final int CURRENT_SCHEMA_VERSION = 6;
     private static final int BUILDING_BIND_HORIZONTAL_RADIUS = 128;
     private static final int BUILDING_BIND_VERTICAL_RADIUS = 64;
 
@@ -146,9 +146,30 @@ public final class CivilizationWorldData extends SavedData {
         return this.buildings.get(oneBasedIndex - 1);
     }
 
-    public BuildingObservation findBuilding(String dimension, int x, int y, int z) {
+        public BuildingObservation findBuilding(String dimension, int x, int y, int z) {
         return this.buildings.stream()
                 .filter(existing -> existing.isSameMarker(dimension, x, y, z))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Finds the loaded ItemFrame that currently backs an observed building. */
+    public ItemFrame findBuildingMarker(ServerLevel level, BuildingObservation building) {
+        if (level == null || building == null
+                || !level.dimension().identifier().toString().equals(building.dimension())) {
+            return null;
+        }
+        BlockPos marker = new BlockPos(building.markerX(), building.markerY(), building.markerZ());
+        if (!level.isLoaded(marker)) {
+            return null;
+        }
+        return level.getEntities(
+                        EntityTypeTest.forClass(ItemFrame.class),
+                        new AABB(marker).inflate(0.5D),
+                        frame -> frame.blockPosition().equals(marker)
+                                && building.functionId().equals(
+                                BuildingMarkerRegistry.functionId(frame.getItem())))
+                .stream()
                 .findFirst()
                 .orElse(null);
     }
@@ -158,7 +179,7 @@ public final class CivilizationWorldData extends SavedData {
             return null;
         }
         return this.buildings.stream()
-                .filter(existing -> residentUuid.equals(existing.residentUuid()))
+                .filter(existing -> existing.hasResidentUuid(residentUuid))
                 .findFirst()
                 .orElse(null);
     }
@@ -277,17 +298,6 @@ public final class CivilizationWorldData extends SavedData {
                         0,
                         0);
             }
-            BuildingMarkerVisualState.apply(candidate.frame(), validation.isValid());
-            if (!validation.isValid()) {
-                CivilizationMod.LOGGER.info(
-                        "Building marker invalid: dimension={}, marker={}, reason={}, air={}, floor={}, ceiling={}",
-                        dimension,
-                        position,
-                        validation.reason(),
-                        validation.interiorAirBlocks(),
-                        validation.floorSupportBlocks(),
-                        validation.ceilingBlocks());
-            }
             String settlementDimension = settlement == null ? "" : settlement.dimension();
             int settlementX = settlement == null ? 0 : settlement.centerX();
             int settlementY = settlement == null ? 0 : settlement.centerY();
@@ -321,7 +331,8 @@ public final class CivilizationWorldData extends SavedData {
                         bedCount,
                         "",
                         "",
-                        storageSnapshot.scanned() ? storageSnapshot : BuildingStorageSnapshot.unscanned());
+                        storageSnapshot.scanned() ? storageSnapshot : BuildingStorageSnapshot.unscanned(),
+                        List.of());
             } else {
                 observation = existing.refreshed(
                         candidate.functionId(),
@@ -341,9 +352,31 @@ public final class CivilizationWorldData extends SavedData {
                 if (storageSnapshot.scanned()) {
                     observation = observation.withStorageSnapshot(storageSnapshot);
                 }
+                        }
+
+            if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())
+                    && observation.residentCount() > capacity
+                    && BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
+                observation = observation.withValidation(
+                        BuildingObservation.VALIDATION_INVALID,
+                        BuildingObservation.VALIDATION_REASON_RESIDENTS_OVER_CAPACITY);
+            }
+            BuildingMarkerVisualState.apply(
+                    candidate.frame(),
+                    BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus()));
+            if (!BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
+                CivilizationMod.LOGGER.info(
+                        "Building marker invalid: dimension={}, marker={}, reason={}, air={}, floor={}, ceiling={}",
+                        dimension,
+                        position,
+                        observation.validationReason(),
+                        validation.interiorAirBlocks(),
+                        validation.floorSupportBlocks(),
+                        validation.ceilingBlocks());
             }
 
             if (existing == null || !existing.equals(observation)) {
+
                 if (existing == null) {
                     this.buildings.add(observation);
                 } else {
@@ -354,7 +387,7 @@ public final class CivilizationWorldData extends SavedData {
             if (settlement != null) {
                 bound++;
             }
-            if (validation.isValid()) {
+            if (BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
                 valid++;
             } else {
                 invalid++;

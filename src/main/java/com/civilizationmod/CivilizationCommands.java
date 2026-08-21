@@ -19,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.npc.villager.Villager;
 
 import java.util.concurrent.CompletableFuture;
@@ -324,9 +325,11 @@ public final class CivilizationCommands {
                 if (!BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
                         return Component.translatable("civilizationmod.building.residence.not_applicable");
                 }
-                return Component.translatable(
+        return Component.translatable(
                         "civilizationmod.building.residence.summary",
                         building.bedCount(),
+                        building.capacity(),
+                        building.residentCount(),
                         building.capacity());
         }
 
@@ -388,9 +391,24 @@ public final class CivilizationCommands {
 			return Component.translatable("civilizationmod.building.validation.detected");
 		}
 
-		        private static Component buildingResident(BuildingObservation building) {
+        private static Component buildingResident(BuildingObservation building) {
                 if (!building.hasResident()) {
                         return Component.translatable("civilizationmod.building.resident.unassigned");
+                }
+                if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
+                        MutableComponent names = Component.empty();
+                        for (int residentIndex = 0; residentIndex < building.residents().size(); residentIndex++) {
+                                if (residentIndex > 0) {
+                                        names.append(Component.translatable("civilizationmod.building.resident.separator"));
+                                }
+                                BuildingObservation.ResidentAssignment resident = building.residents().get(residentIndex);
+                                names.append(Component.literal(resident.displayName()));
+                        }
+                        return Component.translatable(
+                                "civilizationmod.building.resident.capacity",
+                                building.residentCount(),
+                                building.capacity(),
+                                names);
                 }
                 return Component.translatable(
                         "civilizationmod.building.resident.assigned",
@@ -427,9 +445,13 @@ public final class CivilizationCommands {
                 if (BuildingObservation.VALIDATION_REASON_NO_CONTAINER.equals(reason)) {
                     return Component.translatable("civilizationmod.building.validation.reason.no_container");
                 }
-                if (BuildingObservation.VALIDATION_REASON_INSUFFICIENT_BEDS.equals(reason)) {
+                                if (BuildingObservation.VALIDATION_REASON_INSUFFICIENT_BEDS.equals(reason)) {
                     return Component.translatable("civilizationmod.building.validation.reason.insufficient_beds");
                 }
+                if (BuildingObservation.VALIDATION_REASON_RESIDENTS_OVER_CAPACITY.equals(reason)) {
+                    return Component.translatable("civilizationmod.building.validation.reason.residents_over_capacity");
+                }
+
 			if (BuildingObservation.VALIDATION_REASON_MARKER_NOT_AT_DOOR.equals(reason)) {
 				return Component.translatable("civilizationmod.building.validation.reason.marker_not_at_door");
 			}
@@ -488,10 +510,11 @@ public final class CivilizationCommands {
                         return 0;
                 }
                 if (!BuildingObservation.VALIDATION_VALID.equals(building.validationStatus())) {
+                        String currentValidationReason = building.validationReason();
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.building_not_valid",
                                 index,
-                                buildingValidationReason(building.validationReason())), false);
+                                buildingValidationReason(currentValidationReason)), false);
                         return 0;
                 }
 
@@ -530,7 +553,13 @@ public final class CivilizationCommands {
                         return 0;
                 }
                 BuildingObservation existingAssignment = data.findBuildingAssignedTo(villager.getStringUUID());
-                if (existingAssignment != null && existingAssignment != building) {
+                boolean alreadyAssignedToTarget = existingAssignment != null
+                        && existingAssignment.isSameMarker(
+                        building.dimension(),
+                        building.markerX(),
+                        building.markerY(),
+                        building.markerZ());
+                if (existingAssignment != null && !alreadyAssignedToTarget) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.already_assigned",
                                 existingAssignment.markerX(),
@@ -539,9 +568,51 @@ public final class CivilizationCommands {
                         return 0;
                 }
 
-                BuildingObservation replacement = building.withResident(
-                        villager.getUUID(),
-                        villager.getName().getString());
+                if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
+                        ItemFrame markerFrame = data.findBuildingMarker(level, building);
+                        WarehouseTerritory territory = markerFrame == null
+                                ? null
+                                : WarehouseTerritory.read(markerFrame.getItem()).orElse(null);
+                        int liveBedCount = ResidenceValidator.countBeds(level, territory);
+                        int targetCapacity = building.capacity();
+                        boolean missingContext = markerFrame == null || territory == null;
+                        boolean insufficientBeds = !missingContext && liveBedCount < targetCapacity;
+                        if (missingContext || insufficientBeds) {
+                                String residenceValidationReason = insufficientBeds
+                                        ? "civilizationmod.building.validation.reason.insufficient_beds"
+                                        : "civilizationmod.building.validation.reason.no_context";
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.assign.building_not_valid",
+                                        index,
+                                        Component.translatable(residenceValidationReason)), false);
+                                return 0;
+                        }
+                        if (liveBedCount != building.bedCount()) {
+                                BuildingObservation measured = building.withResidenceMeasurements(
+                                        building.capacity(),
+                                        liveBedCount);
+                                if (!data.replaceBuilding(building, measured)) {
+                                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                                "civilizationmod.command.assign.save_failed"), false);
+                                        return 0;
+                                }
+                                building = measured;
+                        }
+                        if (!alreadyAssignedToTarget && building.residentCount() >= building.capacity()) {
+                                int currentResidentCount = building.residentCount();
+                                int currentCapacity = building.capacity();
+                                source.sendSuccess(() -> CivilizationMessages.translatable(
+                                        "civilizationmod.command.assign.residence_full",
+                                        index,
+                                        currentResidentCount,
+                                        currentCapacity), false);
+                                return 0;
+                        }
+                }
+
+                BuildingObservation replacement = BuildingFunction.RESIDENCE.id().equals(building.functionId())
+                        ? building.withAddedResident(villager.getUUID(), villager.getName().getString())
+                        : building.withResident(villager.getUUID(), villager.getName().getString());
                 if (!data.replaceBuilding(building, replacement)) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.save_failed"), false);

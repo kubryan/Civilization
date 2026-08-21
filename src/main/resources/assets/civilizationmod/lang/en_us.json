@@ -22,7 +22,9 @@
   "civilizationmod.command.building.scan.result": "Building scan radius %1$d: detected=%2$d, updated=%3$d, bound=%4$d, valid=%5$d, invalid=%6$d.",
   "civilizationmod.command.building.entry": "Building #%1$d: function=%2$s, marker=%3$s (%4$d, %5$d, %6$d), settlement=%7$s, binding=%8$s, validation=%9$s, reason=%10$s, resident=%11$s, residence=%12$s, first_seen=%13$d, last_seen=%14$d, storage=%15$s",
   "civilizationmod.command.assign.invalid_building": "Building index %1$d is invalid. Observed buildings: %2$d.",
-  "civilizationmod.command.assign.building_not_valid": "Building #%1$d cannot receive a villager because it is not valid (%2$s).",
+    "civilizationmod.command.assign.building_not_valid": "Building #%1$d cannot receive a villager because it is not valid (%2$s).",
+  "civilizationmod.command.assign.residence_full": "Residence #%1$d is full: residents=%2$d / capacity=%3$d.",
+
   "civilizationmod.command.assign.requires_player": "This form of assign must be executed by a player.",
   "civilizationmod.command.assign.villager_not_found": "No living villager is being looked at within range.",
   "civilizationmod.command.assign.target_not_villager": "The selected entity is not a vanilla villager.",
@@ -50,7 +52,9 @@
   "civilizationmod.building.validation.reason.no_walls": "one or more non-door walls are open",
   "civilizationmod.building.validation.reason.no_entry": "the room cannot be entered through the door",
   "civilizationmod.building.validation.reason.no_container": "warehouse has no chest",
-  "civilizationmod.building.validation.reason.insufficient_beds": "residence does not have enough beds for this marker",
+    "civilizationmod.building.validation.reason.insufficient_beds": "residence does not have enough beds for this marker",
+  "civilizationmod.building.validation.reason.residents_over_capacity": "residence has more assigned villagers than this marker allows",
+
   "civilizationmod.command.building.generate.failure.invalid_context": "invalid command context",
   "civilizationmod.command.building.generate.failure.unloaded": "the target area is not loaded",
   "civilizationmod.command.building.generate.failure.existing_item_frame": "an ItemFrame already exists in the test area",
@@ -64,9 +68,13 @@
   "civilizationmod.building.binding.index": "settlement #%1$d",
   "civilizationmod.building.binding.unbound": "unbound",
   "civilizationmod.building.resident.unassigned": "unassigned",
-  "civilizationmod.building.resident.assigned": "%1$s (%2$s)",
+    "civilizationmod.building.resident.assigned": "%1$s (%2$s)",
+  "civilizationmod.building.resident.capacity": "residents=%1$d / capacity=%2$d: %3$s",
+  "civilizationmod.building.resident.separator": ", ",
+
   "civilizationmod.building.residence.not_applicable": "not applicable",
-  "civilizationmod.building.residence.summary": "beds=%1$d / capacity=%2$d",
+    "civilizationmod.building.residence.summary": "beds=%1$d / required=%2$d, residents=%3$d / capacity=%4$d",
+
   "civilizationmod.building.storage.unscanned": "chests not scanned",
   "civilizationmod.building.storage.empty": "empty",
   "civilizationmod.building.storage.item": "%1$s x%2$d",

@@ -38,7 +38,7 @@ public final class ResidenceValidator {
                 beds);
     }
 
-    private static int countBeds(ServerLevel level, WarehouseTerritory territory) {
+    public static int countBeds(ServerLevel level, WarehouseTerritory territory) {
         if (territory == null) {
             return 0;
         }

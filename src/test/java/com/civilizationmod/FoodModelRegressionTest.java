@@ -1,5 +1,8 @@
 package com.civilizationmod;
 
+import com.google.gson.JsonElement;
+import com.mojang.serialization.JsonOps;
+
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -29,8 +32,9 @@ public final class FoodModelRegressionTest {
 		checkPopulationRefresh();
 		checkBuildingFunctionContract();
 		checkBuildingObservationLifecycle();
-		checkBuildingResidentAssignment();
-		checkBuildingSettlementBinding();
+			checkBuildingResidentAssignment();
+			checkResidenceCapacityRoster();
+			checkBuildingSettlementBinding();
 			checkBuildingGeometryValidator();
 			checkWarehouseTerritoryBounds();
 			System.out.println("FoodModelRegressionTest: PASS");
@@ -300,6 +304,51 @@ public final class FoodModelRegressionTest {
 			if (refreshed.withoutResident().hasResident()) {
 				throw new AssertionError("withoutResident should clear the assignment");
 			}
+		}
+
+		private static void checkResidenceCapacityRoster() {
+			BuildingObservation base = new BuildingObservation(
+					BuildingFunction.RESIDENCE.id(),
+					"minecraft:overworld",
+					10,
+					64,
+					20,
+					BuildingObservation.STATUS_BOUND,
+					100L,
+					100L,
+					"minecraft:overworld",
+					0,
+					64,
+					0).withResidenceMeasurements(2, 2);
+			UUID first = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+			UUID second = UUID.fromString("123e4567-e89b-12d3-a456-426614174002");
+			BuildingObservation assigned = base.withAddedResident(first, "Resident One")
+					.withAddedResident(second, "Resident Two")
+					.withAddedResident(second, "Resident Two Again");
+			equalsInt(2, assigned.residentCount(), "residence roster capacity test count");
+			if (!assigned.hasResident(first) || !assigned.hasResident(second)) {
+				throw new AssertionError("residence roster should contain both assigned villagers");
+			}
+			BuildingObservation refreshed = assigned.refreshed(
+					BuildingFunction.RESIDENCE.id(),
+					200L,
+					BuildingObservation.STATUS_BOUND,
+					BuildingObservation.VALIDATION_VALID,
+					BuildingObservation.VALIDATION_REASON_VALID,
+					"minecraft:overworld",
+					0,
+					64,
+					0,
+					2,
+					2,
+					BuildingStorageSnapshot.unscanned());
+			equalsInt(2, refreshed.residentCount(), "residence roster survives rescan");
+
+			JsonElement encoded = BuildingObservation.CODEC.encodeStart(JsonOps.INSTANCE, assigned).getOrThrow();
+			BuildingObservation decoded = BuildingObservation.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+			equalsInt(2, decoded.residentCount(), "residence roster codec count");
+			equalsString("Resident Two", decoded.residents().get(1).name(), "residence roster codec name");
+			equalsInt(1, base.withResident(first, "Legacy Resident").residentCount(), "legacy single resident compatibility");
 		}
 
 		private static void checkBuildingSettlementBinding() {

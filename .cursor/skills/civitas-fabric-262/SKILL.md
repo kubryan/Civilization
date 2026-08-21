@@ -326,3 +326,16 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 預覽只讀 marker ItemStack 的 `WarehouseTerritory` CustomData／`selectedDimension`；不讀 client Saved Data，不改寫 server 狀態。切換離開未完成 marker 時，既有 `inventoryTick` 規則會清除 pending point；完成 territory 可以保存，但換回 marker 前不顯示預覽。此方案與 `LevelRenderEvents.BeforeGizmos` 的 client-only 路線分離，避免 dedicated server 載入 client 類別。
 
 查證證據：Fabric API 25.3.2+515ac5339e sources `LevelRenderContext.java`、實際 26.2 compile 與 build；官方事件背景文件：[Fabric Events 26.2](https://docs.fabricmc.net/develop/events)。
+
+
+## 已查證：住宅 marker 多居民容量與 SavedData 相容規則（2026-08-21）
+
+住宅 marker 的容量仍由 common-side `BuildingMarkerRegistry.MarkerDefinition.capacity` 決定；`ResidenceValidator` 以領地內 `BlockTags.BEDS` 與 `BedBlock.PART == BedPart.FOOT` 計算唯一床位。住宅有效的基本條件是 `bedCount >= capacity`，而村民入住上限是已保存 roster 的 `residentCount <= capacity`；床位數與居民數是兩個獨立檢查，不能只用其中一個代替另一個。
+
+`BuildingObservation` 保留舊版 `resident_uuid`／`resident_name` 欄位，並在 nested `CodecTail` 新增 optional `residents` list。讀取舊 warehouse 或舊單居民住宅資料時，canonical constructor 會把 legacy resident 正規化成 roster 第一項；新資料以 `ResidentAssignment` 保存 UUID 與診斷用名稱，重複 UUID 會去重。`refreshed`、`withStorageSnapshot` 與住宅容量更新 helper 必須保留 roster，重掃不能清除既有入住居民。
+
+`/civitas assign` 的 server gate 對住宅先重新找目前載入的 marker ItemFrame 與 territory、重新計算即時床位；若 marker／territory 缺失或床位不足則拒絕。若同一名村民已在目標住宅，操作保持冪等；若目標住宅 roster 已達 marker capacity，拒絕新居民。warehouse 維持單一 resident 行為。building scan 若發現保存 roster 超過目前 marker capacity，保留資料但將 observation 標為 `invalid`、reason=`residents_over_capacity` 並移除有效 glint，不自動刪除村民資料。
+
+`BuildingResidentService` 每 20 server ticks 逐一解析住宅 roster 中的原版 `Villager` UUID 並導航到 marker；warehouse 仍執行原本單一居民的物流入庫。`CivilizationWorldData.findBuildingAssignedTo` 必須按 roster 搜尋，確保住宅多居民右鍵互動仍能找到所屬 building。這次 schema version 升至 6；新增 roster 欄位有 optional default，舊世界可載入。
+
+驗證方式：`runFoodModelRegressionTest` 檢查 roster 新增、重複去重、重掃保留、Codec round-trip 與 legacy single-resident compatibility；`compileJava`、`clean build` 與 `runClient` smoke test 需成功。
