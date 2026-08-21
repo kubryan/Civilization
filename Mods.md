@@ -3074,3 +3074,46 @@ README 修改為文件內容，沒有新增 Minecraft API 或 Java 程式碼，�
 ### 下一步
 
 回到遊戲內驗收住宅 marker 的床位容量與領地粒子邊界；若未來繼續開發，先以目前已推送的 `main` 為基準建立下一個功能提交，不要重新使用舊的未 rebase commit SHA。
+
+
+## 2026-08-21 — 住宅 Marker 階梯式配方修正
+
+### 變更
+
+依照新的殖民地建設設計，住宅 marker 配方已由原本的床與鐵錠配方改為階梯式升級配方。`residential_marker_1` 現在使用 3×3 shaped recipe：八個 `ItemTags.WOOL` 羊毛包圍中央鐵錠；`residential_marker_2` 使用 2 個 `residential_marker_1` 的 shapeless recipe；`residential_marker_4` 使用 4 個 `residential_marker_1` 的 shapeless recipe；`residential_marker_6` 使用 6 個 `residential_marker_1` 的 shapeless recipe。
+
+解鎖條件也一併修正：1 床住宅 marker 以持有任一羊毛作為解鎖條件；2、4、6 床住宅 marker 以持有 `residential_marker_1` 作為解鎖條件。這樣住宅系統會先讓玩家取得基礎住宅標誌，再透過多個基礎標誌合成更高容量的住宅標誌，且配方不再依賴床物品。
+
+### 影響檔案
+
+- `src/client/java/com/civilizationmod/client/CivilizationModRecipeProvider.java`：修改住宅 marker 的 shaped／shapeless datagen 定義與解鎖條件。
+- `src/main/generated/data/civilizationmod/recipe/residential_marker_1.json`：生成羊毛與鐵錠的 3×3 shaped recipe。
+- `src/main/generated/data/civilizationmod/recipe/residential_marker_2.json`：生成 2 個 1 床 marker 的 shapeless recipe。
+- `src/main/generated/data/civilizationmod/recipe/residential_marker_4.json`：生成 4 個 1 床 marker 的 shapeless recipe。
+- `src/main/generated/data/civilizationmod/recipe/residential_marker_6.json`：生成 6 個 1 床 marker 的 shapeless recipe。
+- `src/main/generated/data/civilizationmod/advancement/recipes/misc/residential_marker_1.json`：解鎖條件改為羊毛。
+- `src/main/generated/data/civilizationmod/advancement/recipes/misc/residential_marker_2.json`、`residential_marker_4.json`、`residential_marker_6.json`：解鎖條件改為持有 1 床 marker。
+- `src/main/generated/.cache/315ef6c70ed81a1f3bfa2fddabcbca61d46c497c`：更新 datagen 內容雜湊記錄。
+- `Mods.md`：追加本次住宅配方變更與驗證結果。
+
+### 查證與驗證
+
+| 項目 | 結果 |
+|---|---|
+| Fabric 26.2 Recipe Generation API | 已查閱官方 Recipe Generation 文件；確認 shapeless recipe 使用 `shapeless(...).requires(...).unlockedBy(...).save(...)`，並可用整數參數要求多個相同物品。 |
+| `gradlew.bat --no-daemon runDatagen --console=plain` | `BUILD SUCCESSFUL`；生成四個住宅 recipe 與對應 advancement。 |
+| Generated recipe JSON | 已確認 1 床為 `crafting_shaped`、2／4／6 床為 `crafting_shapeless`，ingredients 數量分別為 2、4、6 個 `residential_marker_1`。 |
+| `gradlew.bat --no-daemon clean build --console=plain` | `BUILD SUCCESSFUL`；common、client、resources、jar、test 與 assemble 均通過。 |
+| `git diff --check` | 沒有 whitespace error；僅有既有的跨平台 LF／CRLF 提示。 |
+
+### 未完成與風險
+
+目前已完成配方資料與建置驗證，尚未在遊戲內開啟配方書或工作台實際合成四種 marker。由於高容量 marker 需要消耗多個 1 床 marker，玩家若要製作 6 床 marker，必須先準備 6 個 1 床 marker；這是本次階梯式設計的預期成本。
+
+### 下一步
+
+在遊戲內驗收：先以羊毛與鐵錠合成 `residential_marker_1`，再以 2、4、6 個 1 床 marker 分別合成 `residential_marker_2`、`residential_marker_4`、`residential_marker_6`；確認配方書解鎖條件、輸出物品數量與住宅 marker 的床位容量驗證一致。
+
+### 來源
+
+- [1] [Fabric Recipe Generation 26.2](https://docs.fabricmc.net/develop/data-generation/recipes)

@@ -1,13 +1,12 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "key": {
-    "b": "#minecraft:beds",
-    "i": "minecraft:iron_ingot"
-  },
-  "pattern": [
-    "bbb",
-    "bbb",
-    "i  "
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "civilizationmod:residential_marker_1",
+    "civilizationmod:residential_marker_1",
+    "civilizationmod:residential_marker_1",
+    "civilizationmod:residential_marker_1",
+    "civilizationmod:residential_marker_1",
+    "civilizationmod:residential_marker_1"
   ],
   "result": {
     "id": "civilizationmod:residential_marker_6"

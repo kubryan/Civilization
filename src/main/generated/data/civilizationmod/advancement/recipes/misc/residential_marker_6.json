@@ -1,11 +1,11 @@
 {
   "parent": "minecraft:recipes/root",
   "criteria": {
-    "has_bed": {
+    "has_residential_marker_1": {
       "conditions": {
         "items": [
           {
-            "items": "#minecraft:beds"
+            "items": "civilizationmod:residential_marker_1"
           }
         ]
       },
@@ -21,7 +21,7 @@
   "requirements": [
     [
       "has_the_recipe",
-      "has_bed"
+      "has_residential_marker_1"
     ]
   ],
   "rewards": {

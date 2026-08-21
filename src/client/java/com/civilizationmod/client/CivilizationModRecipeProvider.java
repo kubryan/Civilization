@@ -39,37 +39,27 @@ public final class CivilizationModRecipeProvider extends FabricRecipeProvider {
                         .save(output);
 
                     shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_1)
-                        .pattern("b")
-                        .pattern("i")
-                        .define('b', ItemTags.BEDS)
+                        .pattern("www")
+                        .pattern("wiw")
+                        .pattern("www")
+                        .define('w', ItemTags.WOOL)
                         .define('i', Items.IRON_INGOT)
-                        .unlockedBy("has_bed", has(ItemTags.BEDS))
+                        .unlockedBy("has_wool", has(ItemTags.WOOL))
                         .save(output);
 
-                    shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_2)
-                        .pattern("bb")
-                        .pattern("i ")
-                        .define('b', ItemTags.BEDS)
-                        .define('i', Items.IRON_INGOT)
-                        .unlockedBy("has_bed", has(ItemTags.BEDS))
+                    shapeless(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_2)
+                        .requires(CivilizationItems.RESIDENTIAL_MARKER_1, 2)
+                        .unlockedBy(getHasName(CivilizationItems.RESIDENTIAL_MARKER_1), has(CivilizationItems.RESIDENTIAL_MARKER_1))
                         .save(output);
 
-                    shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_4)
-                        .pattern("bb")
-                        .pattern("bb")
-                        .pattern("i ")
-                        .define('b', ItemTags.BEDS)
-                        .define('i', Items.IRON_INGOT)
-                        .unlockedBy("has_bed", has(ItemTags.BEDS))
+                    shapeless(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_4)
+                        .requires(CivilizationItems.RESIDENTIAL_MARKER_1, 4)
+                        .unlockedBy(getHasName(CivilizationItems.RESIDENTIAL_MARKER_1), has(CivilizationItems.RESIDENTIAL_MARKER_1))
                         .save(output);
 
-                    shaped(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_6)
-                        .pattern("bbb")
-                        .pattern("bbb")
-                        .pattern("i  ")
-                        .define('b', ItemTags.BEDS)
-                        .define('i', Items.IRON_INGOT)
-                        .unlockedBy("has_bed", has(ItemTags.BEDS))
+                    shapeless(RecipeCategory.MISC, CivilizationItems.RESIDENTIAL_MARKER_6)
+                        .requires(CivilizationItems.RESIDENTIAL_MARKER_1, 6)
+                        .unlockedBy(getHasName(CivilizationItems.RESIDENTIAL_MARKER_1), has(CivilizationItems.RESIDENTIAL_MARKER_1))
                         .save(output);
             }
         };

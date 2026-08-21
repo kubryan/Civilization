@@ -1,12 +1,13 @@
 {
   "type": "minecraft:crafting_shaped",
   "key": {
-    "b": "#minecraft:beds",
-    "i": "minecraft:iron_ingot"
+    "i": "minecraft:iron_ingot",
+    "w": "#minecraft:wool"
   },
   "pattern": [
-    "b",
-    "i"
+    "www",
+    "wiw",
+    "www"
   ],
   "result": {
     "id": "civilizationmod:residential_marker_1"
