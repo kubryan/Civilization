@@ -27,9 +27,9 @@
   "civilizationmod.command.building.invalid": "建築編號 %1$d 無效。目前已觀測建築：%2$d 座。",
     "civilizationmod.command.building.scan.result": "建築掃描半徑 %1$d：偵測到 %2$d 個，更新 %3$d 個，已綁定殖民地 %4$d 個，有效=%5$d 個，無效=%6$d 個，新增市政廳核心=%7$d 個，市政廳衝突=%8$d 個。",
   "civilizationmod.command.town_hall.none": "目前沒有已登記的市政廳核心。",
-  "civilizationmod.command.town_hall.entry": "市政廳 #%1$d：殖民地 ID=%2$s，維度=%3$s，標誌位置=（%4$d，%5$d，%6$d），建立時間=%7$d，範圍半徑=%8$d。",
-  "civilizationmod.command.town_hall.radius.updated": "市政廳 #%1$d 範圍半徑已更新：殖民地 ID=%2$s，半徑=%3$d。",
-  "civilizationmod.command.town_hall.radius.unchanged": "市政廳 #%1$d 已經使用半徑 %2$d。",
+  "civilizationmod.command.town_hall.entry": "市政廳 #%1$d：殖民地 ID=%2$s，維度=%3$s，標誌位置=（%4$d，%5$d，%6$d），建立時間=%7$d，軸對齊立方範圍半徑=%8$d（不是圓形）。",
+  "civilizationmod.command.town_hall.radius.updated": "市政廳 #%1$d 軸對齊立方範圍已更新：殖民地 ID=%2$s，範圍半徑=%3$d（不是圓形）。",
+  "civilizationmod.command.town_hall.radius.unchanged": "市政廳 #%1$d 已經使用軸對齊立方範圍半徑 %2$d（不是圓形）。",
   "civilizationmod.command.town_hall.radius.overlapping": "市政廳 #%1$d 的半徑設定被拒絕，因為會與殖民地 %2$s 重疊。",
   "civilizationmod.command.town_hall.radius.invalid": "市政廳編號 %1$d 無效。目前已登記市政廳：%2$d 座。",
 
@@ -184,7 +184,7 @@
   "civilizationmod.command.help.assign": "/civitas assign <建築編號> [村民]：將村民指派到有效殖民地建築；若該維度沒有市政廳，有效建築會在市政廳建立前使用過渡模式。",
   "civilizationmod.command.help.unassign": "/civitas unassign <建築編號> [村民]：解除村民與建築的指派關係。",
   "civilizationmod.command.help.resident": "/civitas resident list：查看居民永久身份、body UUID、殖民地、建築與生命週期。",
-  "civilizationmod.command.help.townhall": "/civitas townhall：查看市政廳核心；使用 townhall radius <編號> <半徑> 調整範圍。",
+  "civilizationmod.command.help.townhall": "/civitas townhall：查看市政廳核心；使用 townhall radius <編號> <半徑> 調整軸對齊立方範圍，不是圓形半徑。",
   "civilizationmod.command.help.scan": "/civitas building scan [半徑]：掃描附近的 Civitas 建築標誌與殖民地歸屬；沒有市政廳的建築會顯示為過渡模式。",
   "civilizationmod.command.help.alias": "所有主要指令也可使用 /civilization 相容命令根；輸入 /civitas help 可再次查看本說明。"
 }

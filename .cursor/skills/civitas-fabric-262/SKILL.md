@@ -560,3 +560,13 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 `BuildingObservation` 的 `withResident`、`withAddedResident`、`withoutResident` helpers 標記為 legacy compatibility API；新功能不得使用。Building refresh 可以原樣保留 legacy list 作 Codec 相容，但 residence capacity validation 必須以 registry-derived active count 為準。
 
 驗證：`test`、`runFoodModelRegressionTest` 與 `build` 通過；新增 registry-only assignment／unassign test，確認新 assignment 不改動 legacy roster；死亡 test 改為確認 roster 保持 legacy、active registry count 下降、dead resident lookup 不再返回 building。查證日期 2026-08-21。
+
+
+## 2026-08-21 — Town Hall 範圍必須明確標示為軸對齊立方體
+
+- 任務：避免玩家把 Town Hall 的 `radius` 誤解為圓形或球形半徑。
+- 已確認：`TownHallCore.contains(BlockPos)` 與核心範圍判定使用 X、Y、Z 三軸分量各自比較；半徑 64 的包含範圍是每軸從 `core - 64` 到 `core + 64` 的軸對齊立方體，邊長為 129 格，並非圓形距離判定。
+- 採用：內部保存欄位與 API 維持 `radius` 以確保 SavedData 相容；所有玩家可見命令回饋、help、README 與 locale 使用「軸對齊立方範圍／範圍半徑」，並明確標示「不是圓形」。
+- 測試：Town Hall regression 必須確認三軸各自的邊界可包含、任一軸超出一格即不包含；角落可包含不代表使用球形距離。
+- 禁止：不要為了文案重命名已保存的 `radius` 欄位，不要把 `contains` 改成平方距離或水平圓形判定。
+- 查證：目前 `TownHallCore.contains` 實作與 `CivitasCoreTest` 立方邊界回歸；日期 2026-08-21。

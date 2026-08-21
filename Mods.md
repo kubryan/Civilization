@@ -4318,3 +4318,40 @@ README 的 References 使用 Fabric 官方 Saved Data 與 Events 文件，不把
 ### 2026-08-21 最終驗證補記
 
 文件同步後重新執行 `gradlew.bat --no-daemon build --console=plain`，結果為 `BUILD SUCCESSFUL`；`compileJava`、`compileClientJava`、`processResources`、JUnit、`runFoodModelRegressionTest`、`check`、`jar`、`sourcesJar`、`assemble` 均完成，並再次得到 `FoodModelRegressionTest: PASS`。先前的 `git diff --check` 只輸出 Windows CRLF 轉換警告，沒有列出實際 trailing whitespace error；遊戲內過渡模式仍待人工驗收。
+
+
+## 2026-08-21 — Town Hall 範圍文案改為軸對齊立方範圍
+
+### 變更
+
+玩家回饋指出「半徑」容易被理解為圓形半徑；但 Civitas 的 Town Hall 範圍實際是以核心為中心、沿 X／Y／Z 三軸分別判定的 axis-aligned cube。現在保留內部 `radius` 欄位與 SavedData 格式，不做破壞性重新命名；玩家可見文字改用「軸對齊立方範圍／範圍半徑」，並明確補上「不是圓形」。半徑 64 的立方體每軸包含核心座標兩側各 64 格，邊長為 129 格；立方體角落可以被包含，即使其歐氏距離超過 64。
+
+Town Hall 查詢、範圍更新成功／未變更回饋、`/civitas help`、README 與三份 locale 均已同步。Town Hall 範圍重疊拒絕與資料欄位的內部語義不變。
+
+### 影響檔案
+
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：英文 Town Hall 查詢、範圍更新與 help 文案。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：繁體中文 Town Hall 查詢、範圍更新與 help 文案。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文文案。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增三軸邊界與立方角落回歸測試。
+- `README.md`：說明半徑 64 的 129×129×129 軸對齊立方範圍及非圓形語義。
+- `.cursor/skills/civitas-fabric-262/SKILL.md` 與 `skills/minecraft-civilization-fabric-262/SKILL.md`：同步可重用範圍語義與命名規則。
+
+### 查證與驗證
+
+本次沒有新增版本敏感 API；沿用既有已驗證的 `TownHallCore.contains(BlockPos)` 與 SavedData。驗證命令如下：
+
+```text
+gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain
+gradlew.bat --no-daemon build --console=plain
+```
+
+兩次均為 `BUILD SUCCESSFUL`；`FoodModelRegressionTest: PASS`。新增 Town Hall 回歸測試通過，完整 build 的 common／client 編譯、資源處理、JUnit、check、jar、sourcesJar 與 assemble 均通過。
+
+### 未完成與風險
+
+遊戲內尚未人工確認新文案在 `/civitas townhall`、`/civitas townhall radius <index> <radius>` 與 `/civitas help` 的三種語系實際顯示；範圍判定本身已有自動化邊界測試。若未來要把內部 Java 欄位從 `radius` 改名為 `rangeRadius`，必須另開 SavedData migration 設計，不可在本次文案修正中直接變更。
+
+### 下一步
+
+啟動 client 後執行 `/civitas townhall`，確認訊息包含「軸對齊立方範圍」與「不是圓形」；執行 `/civitas townhall radius 1 128`，確認更新訊息使用相同術語；最後執行 `/civitas help`，確認 Town Hall 說明指出這是 axis-aligned cube range 而非 circular radius。

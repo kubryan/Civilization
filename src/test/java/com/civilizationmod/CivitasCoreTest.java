@@ -418,6 +418,8 @@ class CivitasCoreTest {
         assertTrue(core.isSameMarker("minecraft:overworld", firstMarker));
         assertEquals(1234L, core.createdAt());
         assertEquals(TownHallCore.DEFAULT_RADIUS, core.radius());
+        assertTrue(core.contains(firstMarker.offset(TownHallCore.DEFAULT_RADIUS, TownHallCore.DEFAULT_RADIUS, TownHallCore.DEFAULT_RADIUS)));
+        assertFalse(core.contains(firstMarker.offset(TownHallCore.DEFAULT_RADIUS + 1, 0, 0)));
 
         CivilizationWorldData.TownHallRegistration same = data.registerTownHall(
                 "minecraft:overworld", firstMarker, 9999L);

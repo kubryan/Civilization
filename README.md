@@ -14,7 +14,7 @@ Civitas 採用「玩家宣告意圖，系統驗證最低條件」的建築哲學
 
 Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放入附著於牆面的 ItemFrame 後，透過 building scan 登記為 Town Hall core，資料會保存於 `CivilizationWorldData`。每座核心都有自己的 `colony_id`、維度、座標、建立時間與範圍半徑。
 
-同一維度可以存在多座 Town Hall，但各自的軸對齊立方體範圍不可重疊；不同維度的 Town Hall 可以並存。預設半徑為 64，允許使用的最大半徑為 512。可使用以下命令調整指定核心的半徑：
+同一維度可以存在多座 Town Hall，但各自的**軸對齊立方範圍**不可重疊；不同維度的 Town Hall 可以並存。這裡的「範圍半徑」不是圓形半徑：半徑 64 代表核心沿 X、Y、Z 三軸各向外延伸 64 格的立方體，邊長約為 129 格，立方體角落的距離會比 64 格更遠。預設範圍半徑為 64，允許使用的最大範圍半徑為 512。可使用以下命令調整指定核心的軸對齊立方範圍：
 
 ```text
 /civitas townhall
@@ -90,7 +90,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係。 |
 | `/civitas resident list` | 查詢 ResidentRecord 清單。 |
 | `/civitas townhall` | 查詢已保存的 Town Hall cores。 |
-| `/civitas townhall radius <index> <radius>` | 調整 Town Hall 範圍並重新計算建築 colony binding。 |
+| `/civitas townhall radius <index> <radius>` | 調整 Town Hall 的軸對齊立方範圍；這不是圓形半徑，變更後會重新計算建築 colony binding。 |
 
 未來新增命令或參數時，必須維持 `/civitas`／`/civilization` 相容別名、Tab completion、server 驗證、本地化與品牌訊息格式。
 
@@ -106,7 +106,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | Warehouse storage snapshot 與安全 allowlist 物流 | 已完成第一版 |
 | 27 格 Civitas Villager backpack | 已完成程式、build 與 client smoke 驗證，並已進行先前遊戲驗收 |
 | 1／2／4／6 容量住宅 marker | 已完成程式、容量檢查與多居民 roster |
-| Town Hall core、SavedData 與多核心非重疊範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
+| Town Hall core、SavedData 與多核心非重疊軸對齊立方範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
 | `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；無 Town Hall 過渡模式已加入，完整範圍內外遊戲驗收仍待確認 |
 | ResidentRecord／ResidentRegistry | 已完成第一版；已收斂為 assignment 唯一寫入來源並通過 SavedData／Codec 回歸測試 |
 | 村民死亡後釋放住宅容量 | 已完成 server death callback 與回歸測試；等待本次遊戲內重新驗收 |
@@ -118,7 +118,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 ## 下一步路線
 
-目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放、玩家命令樹整理，以及無 Town Hall 的舊世界過渡運作。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先遊戲內驗收是：在沒有 Town Hall 的維度確認有效 warehouse／住宅仍可 assign、導航與物流，接著建立 Town Hall，確認同一範圍內建築取得 `colony_id`，範圍外建築立即停止 colony 功能。
+目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放、玩家命令樹整理，以及無 Town Hall 的舊世界過渡運作。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先遊戲內驗收是：在沒有 Town Hall 的維度確認有效 warehouse／住宅仍可 assign、導航與物流，接著建立 Town Hall，確認軸對齊立方範圍內建築取得 `colony_id`，範圍外建築立即停止 colony 功能，並確認 `/civitas townhall` 的回饋明確寫出「不是圓形」。
 
 通過死亡容量的遊戲內驗收後，將繼續完善居民 lifecycle、移除與 body rebind 規則，再處理住宅居民的床位分配與工作建築關係。自訂 NPC Entity 暫不列入下一個切片，因為目前應先穩定 server SavedData、原版 Villager body、住宅容量與物流閉環。
 

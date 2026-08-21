@@ -27,9 +27,9 @@
   "civilizationmod.command.building.invalid": "Building index %1$d is invalid. Observed buildings: %2$d.",
     "civilizationmod.command.building.scan.result": "Building scan radius %1$d: detected=%2$d, updated=%3$d, colony-bound=%4$d, valid=%5$d, invalid=%6$d, town halls registered=%7$d, town hall conflicts=%8$d.",
   "civilizationmod.command.town_hall.none": "No Town Hall core is registered.",
-  "civilizationmod.command.town_hall.entry": "Town Hall #%1$d: colony_id=%2$s, dimension=%3$s, marker=(%4$d, %5$d, %6$d), created_at=%7$d, radius=%8$d.",
-  "civilizationmod.command.town_hall.radius.updated": "Town Hall #%1$d radius updated: colony_id=%2$s, radius=%3$d.",
-  "civilizationmod.command.town_hall.radius.unchanged": "Town Hall #%1$d already uses radius %2$d.",
+  "civilizationmod.command.town_hall.entry": "Town Hall #%1$d: colony_id=%2$s, dimension=%3$s, marker=(%4$d, %5$d, %6$d), created_at=%7$d, axis-aligned cube range radius=%8$d (not circular).",
+  "civilizationmod.command.town_hall.radius.updated": "Town Hall #%1$d axis-aligned cube range updated: colony_id=%2$s, range radius=%3$d (not circular).",
+  "civilizationmod.command.town_hall.radius.unchanged": "Town Hall #%1$d already uses axis-aligned cube range radius %2$d (not circular).",
   "civilizationmod.command.town_hall.radius.overlapping": "Town Hall #%1$d radius rejected because it overlaps colony %2$s.",
   "civilizationmod.command.town_hall.radius.invalid": "Town Hall index %1$d is invalid. Registered Town Halls: %2$d.",
 
@@ -184,7 +184,7 @@
   "civilizationmod.command.help.assign": "/civitas assign <building index> [villager]: assign a villager to a valid colony building; with no Town Hall in the dimension, a valid building uses transition mode until a Town Hall is placed.",
   "civilizationmod.command.help.unassign": "/civitas unassign <building index> [villager]: remove a villager assignment from a building.",
   "civilizationmod.command.help.resident": "/civitas resident list: view resident identity, body UUID, colony, buildings and lifecycle.",
-  "civilizationmod.command.help.townhall": "/civitas townhall: view Town Hall cores; use townhall radius <index> <radius> to adjust a range.",
+  "civilizationmod.command.help.townhall": "/civitas townhall: view Town Hall cores; use townhall radius <index> <radius> to adjust an axis-aligned cube range, not a circular radius.",
   "civilizationmod.command.help.scan": "/civitas building scan [radius]: scan nearby Civitas markers and colony binding; buildings without a Town Hall are shown as transition mode.",
   "civilizationmod.command.help.alias": "All main commands also support the /civilization compatibility root; use /civitas help to show this again."
 }
