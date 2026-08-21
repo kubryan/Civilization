@@ -603,3 +603,15 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 - 禁止：不可僅以 `upsert(...)` 回傳 `true` 判斷「新增」；`upsert` 的 true 可能代表替換、而且不能區分同目標 no-op。不可讓 roster count 取代 registry-derived active count。
 - 查證：本專案 `CivitasCoreTest` 與 Fabric 26.2 server `ResidentRecordGameTest` 均已加入同目標重複 assignment 回歸案例；驗證日期 2026-08-22。
 
+
+
+## 2026-08-22 — Unassign index and canonical target rules
+
+- 任務：修正 `/civitas unassign 0` 不易理解，以及 building index 與 ResidentRegistry assignment 不一致時的解除指派問題。
+- 採用：所有玩家可見的 `building_index` 與 `resident_index` 都是 1-based 顯示編號；命令 parser 可先接受整數，再由 server 對 `< 1` 顯示本地化提示，避免 Brigadier 通用錯誤遮蔽「請先查 building list／resident list」的操作指引。suggestion provider 仍只提供從 1 開始的有效編號。
+- 採用：保留 `/civitas unassign <building_index> [villager]`，並新增 `/civitas unassign villager`（依玩家準星選取存活 Villager）與 `/civitas unassign resident <resident_index>`（依 `/civitas resident list` 的 1-based 編號）。後兩者與舊入口共用 server-side 清除服務。
+- 已確認：`CivilizationWorldData.clearResidentAssignmentByResidentId(...)` 直接由 `ResidentRegistry.findByResidentId(...)` 找到 active record，清除 home／work／role／colony 並 `setDirty()`；不讀或回寫 legacy `BuildingObservation` roster，因此 body 暫時不載入或 roster 不同步時仍可依 canonical record 解除指派。
+- 採用：解除指派成功後，若當前 body UUID 可在已載入 server level 找到，才清除 Civitas role visual；找不到 body 不把它誤判為 removed，仍只清除 registry assignment。
+- 禁止：不要把 Java list 的 0-based offset 暴露給玩家；不要用 legacy roster 判斷「沒有被指派」；不要把 chunk unload／body 暫時不存在當成 removed lifecycle。
+- 查證：使用既有已查證的 `ServerLevel.getEntityInAnyDimension(UUID)` 與 server level iteration；本次未新增未查證 Fabric 26.2 API。JUnit command-tree 與 registry-only unassign regression 已加入，驗證日期 2026-08-22。
+

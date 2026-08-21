@@ -55,7 +55,25 @@ public final class BuildingResidentService {
         }
     }
 
+        public static Villager findVillagerByUuid(MinecraftServer server, UUID entityUuid) {
+        if (server == null || entityUuid == null) {
+            return null;
+        }
+        for (ResourceKey<Level> key : server.levelKeys()) {
+            ServerLevel level = server.getLevel(key);
+            if (level == null) {
+                continue;
+            }
+            Entity entity = level.getEntityInAnyDimension(entityUuid);
+            if (entity instanceof Villager villager && villager.isAlive()) {
+                return villager;
+            }
+        }
+        return null;
+    }
+
     public static Villager findLookedAtVillager(ServerLevel level, ServerPlayer player) {
+
         Vec3 eyePosition = player.getEyePosition(1.0F);
         Vec3 viewVector = player.getViewVector(1.0F);
         double range = LOOK_RANGE;

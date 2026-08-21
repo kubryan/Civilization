@@ -116,7 +116,7 @@ public final class CivilizationCommands {
 
                 private static LiteralArgumentBuilder<CommandSourceStack> unassignCommand() {
                 return Commands.literal("unassign")
-                        .then(Commands.argument("building_index", IntegerArgumentType.integer(1))
+                        .then(Commands.argument("building_index", IntegerArgumentType.integer())
                                 .suggests(CivilizationCommands::suggestBuildingIndex)
                                 .executes(context -> unassignResident(
                                         context.getSource(),
@@ -126,13 +126,104 @@ public final class CivilizationCommands {
                                         .executes(context -> unassignResident(
                                                 context.getSource(),
                                                 IntegerArgumentType.getInteger(context, "building_index"),
-                                                EntityArgument.getEntity(context, "villager")))));
+                                                EntityArgument.getEntity(context, "villager")))))
+                        .then(Commands.literal("villager")
+                                .executes(context -> unassignLookedAtResident(context.getSource())))
+                        .then(Commands.literal("resident")
+                                .then(Commands.argument("resident_index", IntegerArgumentType.integer())
+                                        .suggests(CivilizationCommands::suggestResidentIndex)
+                                        .executes(context -> unassignByResidentIndex(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "resident_index")))));
         }
 
         private static LiteralArgumentBuilder<CommandSourceStack> residentCommand() {
                 return Commands.literal("resident")
                         .then(Commands.literal("list")
                                 .executes(context -> residentList(context.getSource())));
+        }
+
+        private static int unassignLookedAtResident(CommandSourceStack source)
+                throws CommandSyntaxException {
+                ServerPlayer player = source.getPlayer();
+                if (player == null) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.requires_player"), false);
+                        return 0;
+                }
+                Villager villager = BuildingResidentService.findLookedAtVillager(source.getLevel(), player);
+                if (villager == null) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.villager_not_found"), false);
+                        return 0;
+                }
+                return clearResidentAssignmentForVillager(source, villager, null);
+        }
+
+        private static int unassignByResidentIndex(CommandSourceStack source, int residentIndex)
+                throws CommandSyntaxException {
+                if (residentIndex < 1) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.resident_index_must_start_at_one"), false);
+                        return 0;
+                }
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                List<ResidentRecord> residents = data.getResidents();
+                if (residentIndex > residents.size()) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.invalid_resident",
+                                residentIndex,
+                                residents.size()), false);
+                        return 0;
+                }
+                ResidentRecord resident = residents.get(residentIndex - 1);
+                return clearResidentAssignmentForResident(source, resident, residentIndex);
+        }
+
+        private static int clearResidentAssignmentForVillager(
+                CommandSourceStack source,
+                Villager villager,
+                Integer buildingIndex
+        ) {
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                ResidentRecord resident = data.getResidentRegistry().findByEntityUuid(villager.getUUID());
+                return clearResidentAssignmentForResident(source, resident, buildingIndex);
+        }
+
+        private static int clearResidentAssignmentForResident(
+                CommandSourceStack source,
+                ResidentRecord resident,
+                Integer buildingIndex
+        ) {
+                if (resident == null || !resident.isActive() || resident.assignedBuildingKey().isBlank()) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.not_assigned_target"), false);
+                        return 0;
+                }
+                CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                if (!data.clearResidentAssignmentByResidentId(
+                        resident.residentId(),
+                        source.getServer().getTickCount())) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.save_failed"), false);
+                        return 0;
+                }
+                Villager body = BuildingResidentService.findVillagerByUuid(
+                        source.getServer(),
+                        resident.entityUuidValue().orElse(null));
+                if (body != null && data.findBuildingAssignedTo(body.getStringUUID()) == null) {
+                        BuildingRoleEquipment.clearIfCivitasRole(body);
+                }
+                Component buildingReference = buildingIndex == null
+                        ? Component.literal(resident.assignedBuildingKey())
+                        : Component.translatable(
+                                "civilizationmod.command.unassign.building_reference",
+                                buildingIndex);
+                source.sendSuccess(() -> CivilizationMessages.translatable(
+                        "civilizationmod.command.unassign.success",
+                        resident.name(),
+                        buildingReference), false);
+                return 1;
         }
 
         private static int residentList(CommandSourceStack source) {
@@ -789,6 +880,11 @@ public final class CivilizationCommands {
         private static int unassignResident(CommandSourceStack source, int index, Entity explicitTarget)
                 throws CommandSyntaxException {
                 CivilizationWorldData data = CivilizationWorldData.get(source.getServer());
+                if (index < 1) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.unassign.index_must_start_at_one"), false);
+                        return 0;
+                }
                 BuildingObservation building = data.getBuilding(index);
                 if (building == null) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
@@ -835,7 +931,8 @@ public final class CivilizationCommands {
                         building.markerZ())) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.unassign.not_assigned",
-                                villager.getName()), false);
+                                villager.getName(),
+                                index), false);
                         return 0;
                 }
 
@@ -847,10 +944,13 @@ public final class CivilizationCommands {
                 if (data.findBuildingAssignedTo(villager.getStringUUID()) == null) {
                         BuildingRoleEquipment.clearIfCivitasRole(villager);
                 }
+                Component buildingReference = Component.translatable(
+                        "civilizationmod.command.unassign.building_reference",
+                        index);
                 source.sendSuccess(() -> CivilizationMessages.translatable(
                         "civilizationmod.command.unassign.success",
                         villager.getName(),
-                        index), false);
+                        buildingReference), false);
                 return 1;
         }
 
@@ -866,16 +966,27 @@ public final class CivilizationCommands {
 			return builder.buildFuture();
 		}
 
-		private static CompletableFuture<Suggestions> suggestBuildingIndex(
+        private static CompletableFuture<Suggestions> suggestBuildingIndex(
 				CommandContext<CommandSourceStack> context,
 				SuggestionsBuilder builder
-		) {
-			CivilizationWorldData data = CivilizationWorldData.get(context.getSource().getServer());
-			for (int index = 1; index <= data.getBuildingCount(); index++) {
-				builder.suggest(index);
+			) {
+				CivilizationWorldData data = CivilizationWorldData.get(context.getSource().getServer());
+				for (int index = 1; index <= data.getBuildingCount(); index++) {
+					builder.suggest(index);
+				}
+				return builder.buildFuture();
 			}
-			return builder.buildFuture();
-		}
+
+        private static CompletableFuture<Suggestions> suggestResidentIndex(
+                CommandContext<CommandSourceStack> context,
+                SuggestionsBuilder builder
+        ) {
+                CivilizationWorldData data = CivilizationWorldData.get(context.getSource().getServer());
+                for (int index = 1; index <= data.getResidents().size(); index++) {
+                        builder.suggest(index);
+                }
+                return builder.buildFuture();
+        }
 
 		                private static CompletableFuture<Suggestions> suggestTownHallIndex(
                                 CommandContext<CommandSourceStack> context,

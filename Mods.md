@@ -4522,3 +4522,48 @@ All 2 required tests passed :)
 ### 下一步
 
 啟動 `runClient`，在同一個已綁定住宅中對同一名 Villager 重複執行 `/civitas assign <building_index>`，再使用綁定裝置重複右鍵一次。第一次應顯示真正成功與目前居民數；第二次應顯示「已是此住宅居民」類提示，居民數保持不變。再退出並重新進入世界重複測試，確認 registry 載入後不會重新顯示成功綁定。
+
+
+## 2026-08-22 — 改善 unassign 1-based index 與 canonical resident 解除指派
+
+### 變更
+
+修正 `/civitas unassign 0` 只得到一般整數語法錯誤、玩家不清楚 building index 從哪裡開始的問題。`unassign` 的 building index parser 現在先接受整數，再由 server handler 對小於 1 的輸入顯示本地化提示，明確說明「建築編號從 1 開始，不是 0」，並引導先執行 `/civitas building list`。正常 dynamic suggestions 仍只提供從 1 開始的有效建築編號。
+
+保留 `/civitas unassign <building_index> [villager]`，並新增兩個較不容易踩索引的入口：`/civitas unassign villager` 依玩家準星解除存活 Villager，以及 `/civitas unassign resident <resident_index>` 依 `/civitas resident list` 的 1-based 居民編號解除指派。`resident_index` 同樣對 0 或超出範圍提供明確提示。
+
+新增 `CivilizationWorldData.clearResidentAssignmentByResidentId(...)`，解除指派直接透過 `ResidentRegistry.findByResidentId(...)` 找 canonical active record，清除 home／work／role／colony 並呼叫 `setDirty()`；不依賴 legacy `BuildingObservation.residents` roster，也不要求 Villager body 目前已載入。若 body UUID 在目前 server level 可找到，才額外清除 Civitas role visual；找不到 body 不視為 `removed`。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：新增 unassign villager／resident 入口、1-based 邊界訊息、resident suggestions 與統一成功／失敗分支。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：新增 registry-only `clearResidentAssignmentByResidentId(...)`。
+- `src/main/java/com/civilizationmod/BuildingResidentService.java`：新增已查證的 server-side Villager UUID lookup helper，供解除指派後清理目前 body 視覺。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：同步 1-based、resident index、準星村民與 building list 提示。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：同步繁體中文訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文訊息。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增 unassign 命令樹與 registry-only residentId 清除測試。
+- `README.md`：同步所有 unassign 用法、1-based 規則與人工驗收流程。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 unassign 索引與 canonical target 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步專案技能副本。
+- `Mods.md`：追加本次正式進度記錄。
+
+### 版本與 API 邊界
+
+本次沒有新增未查證的 Fabric 26.2 API、Mixin、networking 或 client-only 類別。`BuildingResidentService` 沿用專案先前已查證的 `ServerLevel.getEntityInAnyDimension(UUID)` 與 server level iteration；所有解除指派與資料變更仍由 logical server 執行。
+
+### 查證與驗證
+
+| 命令 | 結果 |
+|---|---|
+| `C:\\Minecraft\\gradlew.bat --no-daemon test --console=plain` | `BUILD SUCCESSFUL`；JUnit command tree、registry-only unassign 與既有回歸測試通過。 |
+| `C:\\Minecraft\\gradlew.bat --no-daemon runGameTest --console=plain` | `BUILD SUCCESSFUL`；Fabric 26.2 server 的 2 個 required tests 通過。 |
+| `C:\\Minecraft\\gradlew.bat --no-daemon build --console=plain` | `BUILD SUCCESSFUL`；common／client、locale、JUnit、FoodModel regression、GameTest、jar 與 assemble 通過。 |
+
+### 未完成與風險
+
+目前還沒有由玩家在一般遊戲世界人工驗收 `/civitas unassign 0` 的聊天文字、`/civitas unassign villager`、`/civitas unassign resident <resident_index>` 與重開世界後的 registry 清除結果。`resident list` 的 index 是整個 ResidentRegistry 顯示清單的 1-based 順序，其中包含 dead historical records；若玩家要解除 active assignment，需確認 list 顯示的 lifecycle 與 assignment 欄位。
+
+### 下一步
+
+在遊戲內先執行 `/civitas building list` 與 `/civitas resident list`。接著測試 `/civitas unassign 0`，確認收到從 1 開始的提示；再用正確建築編號測試準星村民、`/civitas unassign villager` 與 `/civitas unassign resident <居民編號>`。確認 `/civitas building inspect`、`/civitas resident list` 的 assignment 已清除，退出重進後再次確認，並驗收跨 building index 不一致時不再因 legacy roster 而誤報「沒有被指派」。

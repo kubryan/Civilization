@@ -604,7 +604,22 @@ public final class CivilizationWorldData extends SavedData {
             return false;
         }
         ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
-        if (current == null) {
+        return clearResidentAssignmentByResidentId(
+                current == null ? null : current.residentId(),
+                observedAt);
+    }
+
+    /**
+     * Clears the active assignment by the stable logical resident id. This is
+     * intentionally registry-only so a stale legacy BuildingObservation roster
+     * cannot make unassign report a false negative.
+     */
+    public boolean clearResidentAssignmentByResidentId(String residentId, long observedAt) {
+        if (residentId == null || residentId.isBlank()) {
+            return false;
+        }
+        ResidentRecord current = this.residentRegistry.findByResidentId(residentId);
+        if (current == null || !current.isActive() || current.assignedBuildingKey().isBlank()) {
             return false;
         }
         ResidentRecord replacement = current.withClearedAssignment(observedAt);

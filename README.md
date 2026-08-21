@@ -106,10 +106,14 @@ ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 
 | `/civitas building list` | 列出已登記建築與驗證／殖民地狀態。 |
 | `/civitas building inspect <index>` | 查看指定建築、居民與 storage snapshot。 |
 | `/civitas assign <building_index> [villager]` | 將 Villager 指派至有效 colony-bound 建築；該維度尚無 Town Hall 時，使用過渡模式。 |
-| `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係。 |
+| `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係；`building_index` 從 1 開始，請先使用 `/civitas building list`。 |
+| `/civitas unassign villager` | 解除玩家準星所注視的存活 Villager；查詢與清除以 ResidentRegistry 為準。 |
+| `/civitas unassign resident <resident_index>` | 依 `/civitas resident list` 顯示的 1-based 居民編號解除指派；不要求 Villager body 目前載入。 |
 | `/civitas resident list` | 查詢 ResidentRecord 清單。 |
 | `/civitas townhall` | 查詢已保存的 Town Hall cores。 |
 | `/civitas townhall radius <index> <radius>` | 調整 Town Hall 的軸對齊立方範圍；這不是圓形半徑，變更後會重新計算建築 colony binding。 |
+
+`building_index` 與 `resident_index` 都是從 1 開始的顯示編號，不是 Java 的 0-based list offset。輸入 0 時，模組會明確提示先查對應的 `building list` 或 `resident list`；動態 suggestions 也只提供從 1 開始的有效值。若 building index 對不上，應先執行 `/civitas building list`；若只想解除準星村民，可使用 `/civitas unassign villager`，若 body 暫時不在載入範圍，可使用 `/civitas unassign resident <resident_index>`。
 
 未來新增命令或參數時，必須維持 `/civitas`／`/civilization` 相容別名、Tab completion、server 驗證、本地化與品牌訊息格式。
 
@@ -200,6 +204,8 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 ```
 
 預期住宅居民數量下降一名，死亡居民仍出現在列表中且 lifecycle 為 `dead`。之後重新指派一名 Villager，確認釋放的容量可以再次使用。對已綁定的同一名 Villager 再執行一次 `/civitas assign` 或使用綁定裝置重複右鍵時，預期顯示「已是此住宅居民」類提示，而不是再次顯示成功綁定；居民數應維持不變。
+
+解除指派的人工驗收應涵蓋 `/civitas unassign 0` 的明確 1-based 提示、`/civitas unassign <building_index>` 的準星村民流程、`/civitas unassign villager` 的直接準星流程，以及 `/civitas unassign resident <resident_index>` 的 registry-only 流程。最後一種即使 Villager body 暫時不在載入範圍，也應能清除 canonical ResidentRecord assignment。
 
 ## 專案規則與研究文件
 

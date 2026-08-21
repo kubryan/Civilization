@@ -40,6 +40,12 @@ class CivitasCoreTest {
         assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("building"));
         assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("townhall"));
         assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("resident"));
+        var unassign = dispatcher.getRoot().getChild("civitas").getChild("unassign");
+        assertNotNull(unassign);
+        assertNotNull(unassign.getChild("building_index"));
+        assertNotNull(unassign.getChild("villager"));
+        assertNotNull(unassign.getChild("resident"));
+        assertNotNull(unassign.getChild("resident").getChild("resident_index"));
         assertNull(dispatcher.getRoot().getChild("civitas").getChild("simulate"));
         assertNull(dispatcher.getRoot().getChild("civitas").getChild("scan"));
         assertNull(dispatcher.getRoot().getChild("civitas").getChild("settlement"));
@@ -289,6 +295,48 @@ class CivitasCoreTest {
         assertFalse(repeated.changed());
         assertEquals(first.resident().residentId(), repeated.resident().residentId());
         assertEquals(1, data.countActiveResidents(stored));
+        assertEquals(0, data.getBuilding(1).residentCount());
+    }
+
+    @Test
+    void unassignByResidentIdUsesRegistryEvenWhenLegacyRosterIsEmpty() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                55,
+                70,
+                10,
+                BuildingObservation.STATUS_BOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                450L,
+                450L,
+                "minecraft:overworld",
+                0,
+                70,
+                0)
+                .withResidenceMeasurements(2, 2)
+                .withColonyBinding(
+                        BuildingObservation.STATUS_BOUND,
+                        "minecraft:overworld@townhall-1",
+                        BuildingObservation.COLONY_REASON_BOUND);
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addBuildingObservation(residence));
+        ResidentRecord assigned = data.ensureResidentAssignment(
+                data.getBuilding(1),
+                RESIDENT_ONE,
+                "Registry Resident",
+                500L);
+        assertNotNull(assigned);
+        assertEquals(0, data.getBuilding(1).residentCount());
+        assertEquals(1, data.countActiveResidents(data.getBuilding(1)));
+
+        assertTrue(data.clearResidentAssignmentByResidentId(assigned.residentId(), 600L));
+        ResidentRecord cleared = data.getResidentRegistry().findByResidentId(assigned.residentId());
+        assertNotNull(cleared);
+        assertEquals("", cleared.assignedBuildingKey());
+        assertEquals(0, data.countActiveResidents(data.getBuilding(1)));
         assertEquals(0, data.getBuilding(1).residentCount());
     }
 

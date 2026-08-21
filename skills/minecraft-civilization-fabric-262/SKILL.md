@@ -704,3 +704,12 @@ Town Hall colony gate 採用「無核心時過渡、建立核心後嚴格」政�
 `ResidentRegistry` 仍是唯一 canonical assignment 寫入來源。只有 `CREATED` 或 `UPDATED` 代表真正新增／變更，才應呼叫 `setDirty()` 並顯示 success／transition success；同一 `entityUuid` 已經 active 且其 `homeBuildingKey` 或 `workBuildingKey` 等於目標 building key 時，必須回傳 `ALREADY_ASSIGNED_TO_TARGET`，不改資料、不增加 active count，也不可顯示成功綁定訊息。若 active record 已有不同的 assigned building key，必須回傳 `ALREADY_ASSIGNED_TO_OTHER_BUILDING`，維持跨建築拒絕。
 
 `/civitas assign` 與 `ResidenceBindingDeviceInteraction` 必須共用此 outcome 分類，並透過三份 locale 顯示「已是此建築居民」或「已被指派到其他建築」。舊的 nullable `ensureResidentAssignment(...)` 可保留作相容 wrapper，但新玩家入口不能只依 `ResidentRecord`／`upsert` nullable 或 boolean 結果推測新增與 no-op。`CivitasCoreTest` 與 Fabric 26.2 server `ResidentRecordGameTest` 應各自覆蓋同目標重複 assignment 且 active count 不變。
+
+
+## 已確認：Unassign index 與 canonical target 規則（2026-08-22）
+
+`/civitas unassign` 的 `building_index` 與 `/civitas unassign resident` 的 `resident_index` 都是玩家看到的 1-based 編號。為了讓 `/civitas unassign 0` 不被 Brigadier 通用整數錯誤遮蔽，parser 可接受整數，server handler 再對小於 1 的值顯示本地化提示，並引導玩家先執行 `/civitas building list` 或 `/civitas resident list`；suggestion provider 只提供從 1 開始的有效值。
+
+保留 `/civitas unassign <building_index> [villager]`，並支援 `/civitas unassign villager` 依玩家準星選取存活 Villager，以及 `/civitas unassign resident <resident_index>` 依 resident list 編號解除指派。`CivilizationWorldData.clearResidentAssignmentByResidentId(...)` 直接使用 `ResidentRegistry.findByResidentId(...)` 找到 active record，清除 home／work／role／colony 並呼叫 `setDirty()`；不以 legacy `BuildingObservation` roster 判斷是否已指派，因此 body 暫時未載入或 roster 不同步時仍可依 canonical registry 解除指派。
+
+解除指派成功後，只有在已載入 server level 找到對應 body UUID 時才清除 Civitas role visual；找不到 body 不視為 removed，也不阻止 registry assignment 清除。不得把 Java 0-based list offset 暴露給玩家，也不得把 chunk unload 當作 removed lifecycle。
