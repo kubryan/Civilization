@@ -496,3 +496,17 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 採用：`shapeless(RecipeCategory.MISC, TOWN_HALL_MARKER).requires(Items.EMERALD).requires(Items.IRON_SWORD).requires(Items.IRON_PICKAXE).requires(Items.IRON_AXE).requires(Items.IRON_SHOVEL)`；每種材料各一份，排列不影響配方，解鎖條件使用持有綠寶石。
 - 禁止：不要保留市政廳的 `pattern(...)` shaped layout，也不要用單一 `ItemTags` 取代四種指定工具。
 - 查證：Minecraft 26.2 common jar `ShapelessRecipeBuilder` javap，日期 2026-08-21。
+
+
+## 2026-08-21 — Civitas Creative Mode Tab API 查證
+
+- 任務：讓已註冊的 Civitas items 出現在創造模式玩家背包。
+- 已確認：Fabric 官方 26.2 Custom Creative Tabs 文件使用 `FabricCreativeModeTab.builder()` 建立自訂 tab，使用 `displayItems((params, output) -> output.accept(item))` 加入 Item／ItemStack，並以 `Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, ResourceKey<CreativeModeTab>, tab)` 註冊；tab title 應使用 `Component.translatable` 與 locale key。
+- 採用：Civitas 建立自己的 Creative Mode Tab，集中放入 warehouse marker、residential marker 1/2/4/6、Town Hall marker、Civitas binding device 與 legacy residence binding device；registry 與 tab 建立放 common `CivilizationItems`，不依賴 client-only 類別。
+- 禁止：不要只把物品放進 client-only inventory screen，也不要硬編碼 tab 顯示文字；不要遺漏 legacy item，避免玩家在創造模式無法取得相容物品。
+- 查證來源：Fabric Docs《Custom Creative Tabs 26.2》與《Creating Your First Item 26.2》，https://docs.fabricmc.net/develop/items/custom-creative-tabs、https://docs.fabricmc.net/develop/items/first-item；日期 2026-08-21。
+
+
+## 2026-08-21 — Creative Tab package 以實際 Fabric API jar 為準
+
+官方 Creative Tabs 範例的 builder 概念可採用，但本專案 Fabric API `0.158.0+26.2` 實際 jar 的 package 是 `net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab`，不是 `net.fabricmc.fabric.api.itemgroup.v1`。同一 jar 也包含 `CreativeModeTabEvents`；新增 Civitas 自訂 tab 使用已編譯確認的 `creativetab.v1` package。

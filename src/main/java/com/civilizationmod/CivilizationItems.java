@@ -1,11 +1,15 @@
 package com.civilizationmod;
 
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
 
 import java.util.function.Function;
 
@@ -71,12 +75,34 @@ public final class CivilizationItems {
             new Item.Properties().stacksTo(1)
     );
 
+    public static final ResourceKey<CreativeModeTab> CIVITAS_CREATIVE_TAB_KEY = ResourceKey.create(
+            BuiltInRegistries.CREATIVE_MODE_TAB.key(),
+            Identifier.fromNamespaceAndPath(CivilizationMod.MOD_ID, "civitas")
+    );
+
+    public static final CreativeModeTab CIVITAS_CREATIVE_TAB = FabricCreativeModeTab.builder()
+            .icon(() -> new ItemStack(TOWN_HALL_MARKER))
+            .title(Component.translatable("itemGroup.civilizationmod.civitas"))
+            .displayItems((parameters, output) -> {
+                output.accept(WAREHOUSE_MARKER);
+                output.accept(RESIDENTIAL_MARKER_1);
+                output.accept(RESIDENTIAL_MARKER_2);
+                output.accept(RESIDENTIAL_MARKER_4);
+                output.accept(RESIDENTIAL_MARKER_6);
+                output.accept(TOWN_HALL_MARKER);
+                output.accept(CIVITAS_BINDING_DEVICE);
+                output.accept(RESIDENCE_BINDING_DEVICE);
+            })
+            .build();
+
     private CivilizationItems() {
 
     }
 
-    public static void initialize() {
-                BuildingMarkerRegistry.registerDefaults();
+        public static void initialize() {
+        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CIVITAS_CREATIVE_TAB_KEY, CIVITAS_CREATIVE_TAB);
+        BuildingMarkerRegistry.registerDefaults();
+
         CivitasBuildingMarkerItem.registerSelectionCallback();
         ResidenceBindingDeviceInteraction.register();
 

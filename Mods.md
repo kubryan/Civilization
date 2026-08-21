@@ -3994,3 +3994,39 @@ test { useJUnitPlatform() }
 ### 下一步
 
 啟動 client 後，在合成台將綠寶石、鐵劍、鐵鎬、鐵斧與鐵鏟任意排列，確認可取得市政廳 marker；再回到 Town Hall 多核心範圍與 colony_id 的遊戲內驗收。
+
+
+## 2026-08-21 — 將 Civitas 物品加入創造模式物品欄
+
+### 變更
+
+新增一個 common-side 的 `創世紀元 / Civitas` 自訂創造模式分頁，集中放入目前已註冊的 Civitas 物品：warehouse marker、住宅 marker 1/2/4/6、市政廳 marker、通用 Civitas 綁定裝置，以及保留相容性的 legacy `residence_binding_device`。分頁 icon 使用市政廳 marker，物品順序依 warehouse、住宅容量、市政廳、通用裝置與 legacy 裝置排列。
+
+分頁標題使用 `Component.translatable("itemGroup.civilizationmod.civitas")`，並同步加入 `en_us`、`zh_tw` 與 `zh_cn`；後兩者維持專案政策的繁體中文。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationItems.java`：建立並註冊 `CIVITAS_CREATIVE_TAB_KEY` 與 `CIVITAS_CREATIVE_TAB`，在 `initialize()` 加入 creative tab registry。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增英文分頁名稱。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：新增繁體中文分頁名稱。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：同步繁體中文分頁名稱。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md` 與全域 Minecraft skill：同步官方文件與實際 Fabric API jar 的 creative tab 查證。
+
+### 查證與驗證
+
+- 版本：Minecraft 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Loom 1.17.19、Gradle 9.5.1、Java 25。
+- Fabric 官方文件確認 `FabricCreativeModeTab.builder()`、`displayItems(...)`、`Component.translatable(...)` 與 creative tab registry 流程：[Custom Creative Tabs 26.2](https://docs.fabricmc.net/develop/items/custom-creative-tabs)。
+- 實際 `fabric-creative-tab-api-v1-5.0.14+d871b99e9e.jar` class list 確認 package 為 `net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab`；初次使用不存在的 `itemgroup.v1` package 時 compile 失敗，已依實際 jar 修正。
+- `gradlew.bat --no-daemon compileJava compileClientJava --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon runDatagen --console=plain`：`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest build --console=plain`：`BUILD SUCCESSFUL`；`FoodModelRegressionTest: PASS`，JUnit 通過。
+- 初次將 `test`、`runFoodModelRegressionTest`、`runDatagen` 與 `build` 放在同一次 Gradle invocation 時，Gradle 9.5 回報 `runDatagen` 與 `sourcesJar` 的 implicit dependency validation；將 datagen 與 build 分開執行後均成功，未修改 Gradle 以掩蓋問題。
+- `gradlew.bat --no-daemon runClient --console=plain`：Fabric creative tab API、Civitas initializer、Indigo、Render thread 與 client initialization 成功；smoke test 完成後停止 client。Realms authorization 與開發環境 run directory cleanup 訊息不影響模組初始化。
+
+### 未完成與風險
+
+尚未由玩家在實際創造模式背包中點擊確認分頁與八個物品的視覺排序；這需要遊戲內人工驗收。自訂分頁目前只放入已註冊的 item registry，未加入未註冊的 future blocks 或自訂 ItemStack 變體。
+
+### 下一步
+
+啟動 `runClient`，進入創造模式開啟物品欄，確認出現 `創世紀元 / Civitas` 分頁，並確認 warehouse、四種住宅、市政廳、通用綁定裝置與 legacy 裝置都能取得。驗收後繼續 ResidentRecord／ResidentRegistry 資料層。

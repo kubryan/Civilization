@@ -1,4 +1,6 @@
 {
+  "itemGroup.civilizationmod.civitas": "Civitas",
+
   "civilizationmod.message.prefix": "Civitas",
   "item.civilizationmod.warehouse_marker": "Warehouse Marker",
   "item.civilizationmod.residential_marker_1": "Residential Marker (1 Bed)",

@@ -587,3 +587,15 @@ BuildingObservation 將 `colony_id` 與 `colony_binding_reason` 放入既有 nes
 ## 已查證：市政廳 marker shapeless recipe（2026-08-21）
 
 Minecraft 26.2 common jar 的 `net.minecraft.data.recipes.ShapelessRecipeBuilder` 已由 javap 確認公開 `requires(ItemLike)`、`requires(ItemLike,int)`、`unlockedBy(...)` 與 `save(...)`。市政廳 marker 的無序配方應使用 `FabricRecipeProvider` 的 `shapeless(RecipeCategory.MISC, ItemLike)`，依序加入 `Items.EMERALD`、`Items.IRON_SWORD`、`Items.IRON_PICKAXE`、`Items.IRON_AXE` 與 `Items.IRON_SHOVEL` 各一份；綠寶石為解鎖條件。排列不影響合成，不能保留 shaped pattern，也不能用單一 item tag 取代四種指定工具。
+
+
+## 已查證：Civitas Creative Mode Tab（2026-08-21）
+
+Fabric 官方 26.2 Custom Creative Tabs 文件確認：自訂創造模式分頁可用 `FabricCreativeModeTab.builder()` 建立，透過 `displayItems((params, output) -> output.accept(item))` 加入 Item／ItemStack，並用 `Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, ResourceKey<CreativeModeTab>, tab)` 註冊；分頁標題使用 `Component.translatable` 與 locale key。Civitas 採用 common-side 自訂分頁，加入 warehouse、住宅 1/2/4/6、Town Hall、通用綁定裝置與 legacy residence binding device；不在 client-only screen 中硬編碼物品或文字。
+
+查證來源：[Fabric Custom Creative Tabs 26.2](https://docs.fabricmc.net/develop/items/custom-creative-tabs)、[Fabric Creating Your First Item 26.2](https://docs.fabricmc.net/develop/items/first-item)，日期 2026-08-21。
+
+
+## 已確認：Fabric API 0.158.0+26.2 Creative Tab package（2026-08-21）
+
+官方 Custom Creative Tabs 文件的 builder 流程可採用，但目前實際依賴 jar `fabric-creative-tab-api-v1-5.0.14+d871b99e9e.jar` 的公開 class package 是 `net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab`；同 jar 另有 `CreativeModeTabEvents`。不要使用不存在的 `net.fabricmc.fabric.api.itemgroup.v1` package。
