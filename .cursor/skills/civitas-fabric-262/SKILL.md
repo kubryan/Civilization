@@ -532,3 +532,31 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 - 禁止：不要在 tick 中因 `getEntityInAnyDimension` 暫時回傳 null 就宣告死亡；chunk unload 不等於死亡。死亡採 server death callback，未來若要處理非死亡 removal 必須另行查證 removal API。
 - 驗證：`compileJava compileClientJava`、`test`、`runFoodModelRegressionTest` 與 `build` 均成功；新增 JUnit 檢查死亡居民保留歷史身份且住宅 roster 數量下降。遊戲內死亡事件尚未重新手動驗收。
 - 查證日期：2026-08-21；方式：Fabric API jar `javap`、Minecraft 26.2 common 編譯與使用者提供 `latest.log`。
+
+
+## 2026-08-21 — 公開命令整理與 `/civitas help`
+
+Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`building`（scan／list／inspect）、`townhall`（含 radius）、`assign`、`unassign` 與 `resident list`。`/civilization` 仍是相容命令根，與 `/civitas` 共用同一套 builder、handler、權限與 suggestions。
+
+舊版 settlement／村莊 scan、`sc`、聚落 `simulate` 與 `building generate` 不再註冊為公開命令。FoodDemandModel、SettlementAdapter 與 deterministic building generator 可保留作資料層、回歸測試或未來重新設計的內部程式，但不可在 help 或命令樹宣稱為目前玩家功能。
+
+`/civitas help` 使用 literal `help`，逐行透過 `CivilizationMessages.translatable(...)` 發送本地化說明；每行都保留金色品牌前綴。Help translation keys 必須同步 `en_us`、`zh_tw` 與 `zh_cn`；後兩者使用繁體中文。Literal `help` 自動提供 Brigadier 基本 Tab completion，不新增無 suggestions 的自由字串參數。
+
+採用：help 內容只說明目前仍存在的命令與參數，並明確提示 `/civilization` 相容命令根。禁止保留已移除命令的公開 README／help 說明，也不要為了顯示 help 而繞過 `CivilizationMessages`。
+
+驗證：`compileJava compileClientJava processResources` 與完整 `build` 成功；三份 locale JSON 已處理；遊戲內 `/civitas help`、`/civilization help` 與 Tab completion 尚待人工驗收。查證日期 2026-08-21。
+
+
+## 2026-08-21 — ResidentRegistry 成為唯一新 assignment 寫入來源
+
+目前 `BuildingObservation.residents` 與 legacy `resident_uuid` 仍保留在 Codec，原因是舊世界遷移與相容讀取；但新 assign／unassign、綁定裝置、死亡清理、building removal 與容量計算不得再寫入或依賴 roster。`ResidentRegistry` canonical list 是新的 assignment 真相來源。
+
+`CivilizationWorldData.get(...)` 載入後只執行冪等 `ResidentRegistry.migrateLegacy(buildings)`，把缺少 canonical record 的 legacy roster assignment 遷移進 registry；不可再呼叫會由 roster 反向更新 canonical assignment 的 refresh method。既有 registry record 優先，legacy roster 不會覆蓋 active、cleared 或 dead assignment。
+
+新的 assignment 應透過 `CivilizationWorldData.ensureResidentAssignment(...)` 寫入 registry；該 API 必須拒絕已 active 且指向另一 building key 的 entity，避免同一 body 同時隸屬兩棟建築。解除指派使用 `clearResidentAssignment(...)`；死亡使用 `markResidentDead(...)`；刪除 marker 使用 registry 的 `clearAssignmentsForBuilding(...)`。這些操作保留 residentId 與歷史資料，並以 `setDirty()` 保存。
+
+住宅容量、建築 inspect、居民名稱、導航與物流查詢使用 `ResidentRegistry.countActiveAssignedTo(...)`／`findActiveAssignedTo(...)` 或 WorldData wrapper。死亡居民 lifecycle 為 `dead`，不再計入 active capacity，但 legacy roster 可以保留原始資料，不應為了修正顯示而重新寫回 roster。
+
+`BuildingObservation` 的 `withResident`、`withAddedResident`、`withoutResident` helpers 標記為 legacy compatibility API；新功能不得使用。Building refresh 可以原樣保留 legacy list 作 Codec 相容，但 residence capacity validation 必須以 registry-derived active count 為準。
+
+驗證：`test`、`runFoodModelRegressionTest` 與 `build` 通過；新增 registry-only assignment／unassign test，確認新 assignment 不改動 legacy roster；死亡 test 改為確認 roster 保持 legacy、active registry count 下降、dead resident lookup 不再返回 building。查證日期 2026-08-21。

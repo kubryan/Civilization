@@ -17,29 +17,22 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.StructureTags;
+
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.npc.villager.Villager;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /** Server commands used to inspect and exercise the civilization world state. */
 public final class CivilizationCommands {
-		private static final int DEFAULT_SCAN_RADIUS = 128;
-		private static final int MIN_SCAN_RADIUS = 16;
-		private static final int MAX_SCAN_RADIUS = 512;
-		private static final int[] SCAN_RADIUS_SUGGESTIONS = {32, 64, 128, 256};
-		private static final int DEFAULT_BUILDING_SCAN_RADIUS = 32;
+
+			private static final int DEFAULT_BUILDING_SCAN_RADIUS = 32;
 		private static final int MIN_BUILDING_SCAN_RADIUS = 8;
 		private static final int MAX_BUILDING_SCAN_RADIUS = 256;
-		private static final int[] BUILDING_SCAN_RADIUS_SUGGESTIONS = {16, 32, 64, 128};
-	private static final int DEFAULT_SIMULATION_STEPS = 1;
-	private static final int MIN_SIMULATION_STEPS = 1;
-	private static final int MAX_SIMULATION_STEPS = 100;
-	private static final int[] SIMULATION_STEPS_SUGGESTIONS = {1, 5, 10, 25, 50, 100};
-	private static final SettlementPopulationProvider POPULATION_PROVIDER = new VanillaVillagerPopulationProvider();
-	private static final SettlementFoodProvider FOOD_PROVIDER = new BootstrapFoodStockProvider();
+			private static final int[] BUILDING_SCAN_RADIUS_SUGGESTIONS = {16, 32, 64, 128};
+
 
 	private CivilizationCommands() {
 	}
@@ -55,19 +48,39 @@ public final class CivilizationCommands {
 
 		private static LiteralArgumentBuilder<CommandSourceStack> rootCommand(String literal) {
 			return Commands.literal(literal)
+										.then(helpCommand())
 					.then(Commands.literal("status").executes(context -> status(context.getSource())))
-					.then(settlementCommand())
-                                                .then(buildingCommand())
-                        .then(townHallCommand())
-                                                .then(assignCommand())
+					.then(buildingCommand())
+					.then(townHallCommand())
+					.then(assignCommand())
+					.then(unassignCommand())
+					.then(residentCommand());
 
-                        .then(unassignCommand())
-                        .then(residentCommand())
-                        .then(simulateCommand())
-
-					.then(scanCommand("scan"))
-					.then(scanCommand("sc"));
 		}
+
+        private static LiteralArgumentBuilder<CommandSourceStack> helpCommand() {
+                return Commands.literal("help")
+                                .executes(context -> help(context.getSource()));
+        }
+
+        private static int help(CommandSourceStack source) {
+                String[] helpKeys = {
+                        "civilizationmod.command.help.title",
+                        "civilizationmod.command.help.status",
+                        "civilizationmod.command.help.building",
+                        "civilizationmod.command.help.assign",
+                        "civilizationmod.command.help.unassign",
+                        "civilizationmod.command.help.resident",
+                        "civilizationmod.command.help.townhall",
+                        "civilizationmod.command.help.scan",
+                        "civilizationmod.command.help.alias"
+                };
+                for (String helpKey : helpKeys) {
+                        final String translationKey = helpKey;
+                        source.sendSuccess(() -> CivilizationMessages.translatable(translationKey), false);
+                }
+                return helpKeys.length;
+        }
 
         private static LiteralArgumentBuilder<CommandSourceStack> townHallCommand() {
                 return Commands.literal("townhall")
@@ -83,21 +96,10 @@ public final class CivilizationCommands {
                                                                                                 context.getSource(),
                                                                                                 IntegerArgumentType.getInteger(context, "index"),
                                                                                                 IntegerArgumentType.getInteger(context, "radius"))))));
-        }
-
-	private static LiteralArgumentBuilder<CommandSourceStack> settlementCommand() {
-
-		return Commands.literal("settlement")
-				.executes(context -> settlementStatus(context.getSource()))
-				.then(Commands.argument("index", IntegerArgumentType.integer(1))
-						.suggests(CivilizationCommands::suggestSettlementIndex)
-						.executes(context -> settlementStatus(
-								context.getSource(),
-								IntegerArgumentType.getInteger(context, "index")
-						)));
-	}
+                }
 
         private static LiteralArgumentBuilder<CommandSourceStack> assignCommand() {
+
                 return Commands.literal("assign")
                         .then(Commands.argument("building_index", IntegerArgumentType.integer(1))
                                 .suggests(CivilizationCommands::suggestBuildingIndex)
@@ -159,28 +161,7 @@ public final class CivilizationCommands {
                 return data.getResidents().size();
         }
 
-        private static LiteralArgumentBuilder<CommandSourceStack> simulateCommand() {
-
-		return Commands.literal("simulate")
-				.executes(context -> simulate(context.getSource(), DEFAULT_SIMULATION_STEPS))
-				.then(Commands.argument("steps", IntegerArgumentType.integer(MIN_SIMULATION_STEPS, MAX_SIMULATION_STEPS))
-						.suggests(CivilizationCommands::suggestSimulationSteps)
-						.executes(context -> simulate(
-								context.getSource(),
-								IntegerArgumentType.getInteger(context, "steps")
-						)));
-	}
-
-	private static LiteralArgumentBuilder<CommandSourceStack> scanCommand(String literal) {
-		return Commands.literal(literal)
-				.executes(context -> scan(context.getSource(), DEFAULT_SCAN_RADIUS))
-				.then(Commands.argument("radius", IntegerArgumentType.integer(MIN_SCAN_RADIUS, MAX_SCAN_RADIUS))
-						.suggests(CivilizationCommands::suggestScanRadius)
-						.executes(context -> scan(
-								context.getSource(),
-								IntegerArgumentType.getInteger(context, "radius")
-						)));
-	}
+        
 
 		private static LiteralArgumentBuilder<CommandSourceStack> buildingCommand() {
 			LiteralArgumentBuilder<CommandSourceStack> scan = Commands.literal("scan")
@@ -196,20 +177,17 @@ public final class CivilizationCommands {
 			LiteralArgumentBuilder<CommandSourceStack> inspect = Commands.literal("inspect")
 					.then(Commands.argument("index", IntegerArgumentType.integer(1))
 							.suggests(CivilizationCommands::suggestBuildingIndex)
-							.executes(context -> inspectBuilding(
-									context.getSource(),
-									IntegerArgumentType.getInteger(context, "index"))));
+														.executes(context -> inspectBuilding(
+										context.getSource(),
+										IntegerArgumentType.getInteger(context, "index"))));
 
-				LiteralArgumentBuilder<CommandSourceStack> generate = Commands.literal("generate")
-						.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-						.executes(context -> generateTestBuilding(context.getSource()));
+				return Commands.literal("building")
 
-			return Commands.literal("building")
 					.executes(context -> buildingList(context.getSource()))
 					.then(scan)
 					.then(Commands.literal("list").executes(context -> buildingList(context.getSource())))
-					.then(inspect)
-					.then(generate);
+										.then(inspect);
+
 		}
 
 		private static int status(CommandSourceStack source) {
@@ -440,22 +418,23 @@ public final class CivilizationCommands {
 					buildingStatus(building.status()),
                         buildingValidationStatus(building.validationStatus()),
                         buildingValidationReason(building.validationReason()),
-                        buildingResident(building),
-                        buildingResidence(building),
+                                                buildingResident(data, building),
+                        buildingResidence(data, building),
+
                         building.firstSeen(),
                         building.lastSeen(),
                         buildingStorage(building));
 		}
 
-        private static Component buildingResidence(BuildingObservation building) {
+        private static Component buildingResidence(CivilizationWorldData data, BuildingObservation building) {
                 if (!BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
                         return Component.translatable("civilizationmod.building.residence.not_applicable");
                 }
-        return Component.translatable(
+                return Component.translatable(
                         "civilizationmod.building.residence.summary",
                         building.bedCount(),
                         building.capacity(),
-                        building.residentCount(),
+                        data.countActiveResidents(building),
                         building.capacity());
         }
 
@@ -521,29 +500,32 @@ public final class CivilizationCommands {
 			return Component.translatable("civilizationmod.building.validation.detected");
 		}
 
-        private static Component buildingResident(BuildingObservation building) {
-                if (!building.hasResident()) {
+        private static Component buildingResident(CivilizationWorldData data, BuildingObservation building) {
+                List<ResidentRecord> residents = data.findActiveResidents(building);
+                if (residents.isEmpty()) {
                         return Component.translatable("civilizationmod.building.resident.unassigned");
                 }
                 if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
                         MutableComponent names = Component.empty();
-                        for (int residentIndex = 0; residentIndex < building.residents().size(); residentIndex++) {
+                        for (int residentIndex = 0; residentIndex < residents.size(); residentIndex++) {
                                 if (residentIndex > 0) {
                                         names.append(Component.translatable("civilizationmod.building.resident.separator"));
                                 }
-                                BuildingObservation.ResidentAssignment resident = building.residents().get(residentIndex);
-                                names.append(Component.literal(resident.displayName()));
+                                ResidentRecord resident = residents.get(residentIndex);
+                                names.append(Component.literal(
+                                        resident.name().isBlank() ? resident.entityUuid() : resident.name()));
                         }
                         return Component.translatable(
                                 "civilizationmod.building.resident.capacity",
-                                building.residentCount(),
+                                residents.size(),
                                 building.capacity(),
                                 names);
                 }
+                ResidentRecord resident = residents.get(0);
                 return Component.translatable(
                         "civilizationmod.building.resident.assigned",
-                        building.residentName().isBlank() ? building.residentUuid() : building.residentName(),
-                        building.residentUuid());
+                        resident.name().isBlank() ? resident.entityUuid() : resident.name(),
+                        resident.entityUuid());
         }
 
         private static Component buildingValidationReason(String reason) {
@@ -744,8 +726,8 @@ public final class CivilizationCommands {
                                 }
                                 building = measured;
                         }
-                        if (!alreadyAssignedToTarget && building.residentCount() >= building.capacity()) {
-                                int currentResidentCount = building.residentCount();
+                        if (!alreadyAssignedToTarget && data.countActiveResidents(building) >= building.capacity()) {
+                                int currentResidentCount = data.countActiveResidents(building);
                                 int currentCapacity = building.capacity();
                                 source.sendSuccess(() -> CivilizationMessages.translatable(
                                         "civilizationmod.command.assign.residence_full",
@@ -753,20 +735,12 @@ public final class CivilizationCommands {
                                         currentResidentCount,
                                         currentCapacity), false);
                                 return 0;
-                        }
+                                                        }
                 }
 
-                                BuildingObservation replacement = BuildingFunction.RESIDENCE.id().equals(building.functionId())
-                        ? building.withAddedResident(villager.getUUID(), villager.getName().getString())
-                        : building.withResident(villager.getUUID(), villager.getName().getString());
-                if (!data.replaceBuilding(building, replacement)) {
-
-                        source.sendSuccess(() -> CivilizationMessages.translatable(
-                                "civilizationmod.command.assign.save_failed"), false);
-                                                return 0;
-                }
                 ResidentRecord resident = data.ensureResidentAssignment(
-                        replacement,
+                        building,
+
                         villager.getUUID(),
                         villager.getName().getString(),
                         source.getServer().getTickCount());
@@ -775,7 +749,7 @@ public final class CivilizationCommands {
                                 "civilizationmod.command.assign.save_failed"), false);
                         return 0;
                 }
-                BuildingResidentService.applyAssignmentVisual(villager, replacement.functionId());
+                BuildingResidentService.applyAssignmentVisual(villager, building.functionId());
                 source.sendSuccess(() -> CivilizationMessages.translatable(
                         "civilizationmod.command.assign.success",
 
@@ -826,20 +800,23 @@ public final class CivilizationCommands {
                         }
                 }
 
-                if (!building.hasResident(villager.getUUID())) {
+                BuildingObservation assignedBuilding = data.findBuildingAssignedTo(villager.getStringUUID());
+                if (assignedBuilding == null || !assignedBuilding.isSameMarker(
+                        building.dimension(),
+                        building.markerX(),
+                        building.markerY(),
+                        building.markerZ())) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.unassign.not_assigned",
                                 villager.getName()), false);
                         return 0;
                 }
 
-                BuildingObservation replacement = building.withoutResident(villager.getUUID());
-                if (!data.replaceBuilding(building, replacement)) {
+                if (!data.clearResidentAssignment(villager.getUUID(), source.getServer().getTickCount())) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.save_failed"), false);
                         return 0;
                 }
-                data.clearResidentAssignment(villager.getUUID(), source.getServer().getTickCount());
                 if (data.findBuildingAssignedTo(villager.getStringUUID()) == null) {
                         BuildingRoleEquipment.clearIfCivitasRole(villager);
                 }
@@ -850,82 +827,7 @@ public final class CivilizationCommands {
                 return 1;
         }
 
-        private static int scan(CommandSourceStack source, int radius) {
-
-		ServerLevel level = source.getLevel();
-		BlockPos origin = BlockPos.containing(source.getPosition());
-		BlockPos villageCenter = level.findNearestMapStructure(
-				StructureTags.VILLAGE,
-				origin,
-				radius,
-				false
-		);
-
-		if (villageCenter == null) {
-			source.sendSuccess(() -> CivilizationMessages.translatable(
-					"civilizationmod.command.scan.none", radius), false);
-			return 0;
-		}
-
-		MinecraftServer server = source.getServer();
-		CivilizationWorldData data = CivilizationWorldData.get(server);
-		SettlementAdapter probe = new SettlementAdapter(
-				"minecraft:village",
-				level.dimension().identifier().toString(),
-				villageCenter.getX(),
-				villageCenter.getY(),
-				villageCenter.getZ(),
-				server.getTickCount(),
-				"discovered",
-				0,
-				0L,
-				FoodDemandModel.DEFAULT_FOOD_CONSUMPTION,
-				0,
-				StabilityDebt.MAX_STABILITY,
-				FoodDemandModel.EVENT_STABLE
-		);
-
-		SettlementAdapter existing = data.findSettlement(probe);
-		if (existing != null) {
-			SettlementAdapter refreshed = FoodStockProvider.refreshPopulation(level, existing, POPULATION_PROVIDER, origin);
-			data.replaceSettlement(existing, refreshed);
-			source.sendSuccess(() -> CivilizationMessages.translatable(
-					"civilizationmod.command.scan.refreshed",
-					villageCenter.getX(),
-					villageCenter.getY(),
-					villageCenter.getZ(),
-					refreshed.dimension(),
-					refreshed.population()), false);
-			return 0;
-		}
-
-		SettlementAdapter settlement = FoodStockProvider.initialize(
-				level,
-				probe,
-				POPULATION_PROVIDER,
-				FOOD_PROVIDER,
-				origin
-		);
-		boolean added = data.addSettlement(settlement);
-
-		source.sendSuccess(() -> CivilizationMessages.translatable(
-				"civilizationmod.command.scan.registered",
-				villageCenter.getX(),
-				villageCenter.getY(),
-				villageCenter.getZ(),
-				settlement.dimension()), false);
-		return added ? 1 : 0;
-	}
-
-	private static CompletableFuture<Suggestions> suggestScanRadius(
-			CommandContext<CommandSourceStack> context,
-			SuggestionsBuilder builder
-	) {
-		for (int radius : SCAN_RADIUS_SUGGESTIONS) {
-			builder.suggest(radius);
-		}
-		return builder.buildFuture();
-	}
+        		
 
 		private static CompletableFuture<Suggestions> suggestBuildingScanRadius(
 				CommandContext<CommandSourceStack> context,
@@ -981,15 +883,7 @@ public final class CivilizationCommands {
 		return builder.buildFuture();
 	}
 
-	private static CompletableFuture<Suggestions> suggestSimulationSteps(
-			CommandContext<CommandSourceStack> context,
-			SuggestionsBuilder builder
-	) {
-		for (int steps : SIMULATION_STEPS_SUGGESTIONS) {
-			builder.suggest(steps);
-		}
-		return builder.buildFuture();
-	}
+	
 
 	private static Component foodEvent(String event) {
 		return switch (event) {
@@ -999,29 +893,6 @@ public final class CivilizationCommands {
 		};
 	}
 
-	private static int simulate(CommandSourceStack source, int steps) {
-		MinecraftServer server = source.getServer();
-		CivilizationWorldData data = CivilizationWorldData.get(server);
-		FoodSimulationSummary summary = null;
-		for (int step = 0; step < steps; step++) {
-			summary = data.advanceSimulation();
-		}
-		if (summary == null) {
-			return 0;
-		}
+	
 
-		FoodSimulationSummary result = summary;
-		source.sendSuccess(() -> CivilizationMessages.translatable(
-				"civilizationmod.command.simulate",
-				result.simulationSteps(),
-				result.population(),
-				result.foodDemand(),
-				result.foodConsumed(),
-				result.foodShortage(),
-				result.foodStock(),
-				result.stabilityDebt(),
-				result.stability(),
-				foodEvent(result.lastFoodEvent())), true);
-		return steps;
-	}
 }

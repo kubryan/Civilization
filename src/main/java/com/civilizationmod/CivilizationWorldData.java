@@ -197,11 +197,10 @@ public final class CivilizationWorldData extends SavedData {
 
     private int migrateLegacyResidents() {
         int added = this.residentRegistry.migrateLegacy(this.buildings);
-        int refreshed = this.residentRegistry.refreshAssignmentsFromBuildings(this.buildings);
-        if (added > 0 || refreshed > 0) {
+        if (added > 0) {
             this.setDirty();
         }
-        return added + refreshed;
+        return added;
     }
 
     public TownHallCore getTownHallCore(String dimension) {
@@ -414,21 +413,17 @@ public final class CivilizationWorldData extends SavedData {
             return null;
         }
         ResidentRecord resident = this.residentRegistry.findByEntityUuid(residentUuid);
-        if (resident != null) {
-            BuildingObservation canonical = findBuildingByKey(resident.assignedBuildingKey());
-            if (canonical != null) {
-                return canonical;
-            }
+        if (resident == null || !resident.isActive()) {
+            return null;
         }
-        return this.buildings.stream()
-                .filter(existing -> existing.hasResidentUuid(residentUuid))
-                .findFirst()
-                .orElse(null);
+        return findBuildingByKey(resident.assignedBuildingKey());
     }
 
     public BuildingObservation findBuildingAssignedToResidentId(String residentId) {
         ResidentRecord resident = this.residentRegistry.findByResidentId(residentId);
-        return resident == null ? null : findBuildingByKey(resident.assignedBuildingKey());
+        return resident == null || !resident.isActive()
+                ? null
+                : findBuildingByKey(resident.assignedBuildingKey());
     }
 
     public BuildingObservation findBuildingByKey(String serializedKey) {
@@ -453,11 +448,18 @@ public final class CivilizationWorldData extends SavedData {
         String role = BuildingFunction.RESIDENCE.id().equals(building.functionId())
                 ? ResidentRecord.ROLE_RESIDENT
                 : ResidentRecord.ROLE_WAREHOUSE_WORKER;
+        ResidentRecord.BuildingKey targetKey = ResidentRecord.BuildingKey.from(building);
         ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
+        if (current != null
+                && current.isActive()
+                && !current.assignedBuildingKey().isBlank()
+                && !current.assignedBuildingKey().equals(targetKey.serialize())) {
+            return null;
+        }
         ResidentRecord replacement = current == null
                 ? ResidentRegistry.createNew(entityUuid, building, role, name, observedAt)
                 : current.withAssignment(
-                        ResidentRecord.BuildingKey.from(building),
+                        targetKey,
                         building.colonyId(),
                         role,
                         observedAt);
@@ -466,6 +468,22 @@ public final class CivilizationWorldData extends SavedData {
         }
         this.setDirty();
         return replacement;
+    }
+
+    public int countActiveResidents(BuildingObservation building) {
+        if (building == null) {
+            return 0;
+        }
+        return this.residentRegistry.countActiveAssignedTo(
+                ResidentRecord.BuildingKey.from(building).serialize());
+    }
+
+    public List<ResidentRecord> findActiveResidents(BuildingObservation building) {
+        if (building == null) {
+            return List.of();
+        }
+        return this.residentRegistry.findActiveAssignedTo(
+                ResidentRecord.BuildingKey.from(building).serialize());
     }
 
     public boolean markResidentDead(UUID entityUuid, long observedAt) {
@@ -482,17 +500,8 @@ public final class CivilizationWorldData extends SavedData {
             return false;
         }
 
-        boolean changed = false;
-        for (int index = 0; index < this.buildings.size(); index++) {
-            BuildingObservation building = this.buildings.get(index);
-            if (!building.hasResident(entityUuid)) {
-                continue;
-            }
-            this.buildings.set(index, building.withoutResident(entityUuid));
-            changed = true;
-        }
         this.setDirty();
-        return changed || !dead.equals(current);
+        return !dead.equals(current);
     }
 
     public boolean clearResidentAssignment(java.util.UUID entityUuid, long observedAt) {
@@ -525,6 +534,9 @@ public final class CivilizationWorldData extends SavedData {
         if (building == null || !this.buildings.remove(building)) {
             return false;
         }
+        this.residentRegistry.clearAssignmentsForBuilding(
+                ResidentRecord.BuildingKey.from(building).serialize(),
+                building.lastSeen());
         this.setDirty();
         return true;
     }
@@ -558,10 +570,14 @@ public final class CivilizationWorldData extends SavedData {
                             && building.functionId().equals(
                             BuildingMarkerRegistry.functionId(frame.getItem()))
             ).isEmpty();
-            if (!markerPresent) {
+                        if (!markerPresent) {
                 this.buildings.remove(index);
+                this.residentRegistry.clearAssignmentsForBuilding(
+                        ResidentRecord.BuildingKey.from(building).serialize(),
+                        building.lastSeen());
                 removed++;
             }
+
         }
 
         if (removed > 0) {
@@ -755,7 +771,7 @@ public final class CivilizationWorldData extends SavedData {
             observation = observation.withColonyBinding(status, colonyId, colonyReason);
 
             if (BuildingFunction.RESIDENCE.id().equals(candidate.functionId())
-                    && observation.residentCount() > capacity
+                    && countActiveResidents(observation) > capacity
                     && BuildingObservation.VALIDATION_VALID.equals(observation.validationStatus())) {
                 observation = observation.withValidation(
                         BuildingObservation.VALIDATION_INVALID,

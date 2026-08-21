@@ -183,33 +183,20 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.FAIL;
         }
 
+        int activeResidents = data.countActiveResidents(building);
         if (BuildingFunction.RESIDENCE.id().equals(building.functionId())
                 && !alreadyAssignedToTarget
-                && building.residentCount() >= building.capacity()) {
+                && activeResidents >= building.capacity()) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.command.assign.residence_full",
                     0,
-                    building.residentCount(),
+                    activeResidents,
                     building.capacity()));
             return InteractionResult.FAIL;
         }
 
-        BuildingObservation replacement;
-        if (BuildingFunction.RESIDENCE.id().equals(building.functionId())) {
-            replacement = alreadyAssignedToTarget
-                    ? building
-                    : building.withAddedResident(villager.getUUID(), villager.getName().getString());
-        } else {
-            replacement = building.withResident(villager.getUUID(), villager.getName().getString());
-        }
-
-        if (!data.replaceBuilding(building, replacement)) {
-            player.sendSystemMessage(CivilizationMessages.translatable(
-                    "civilizationmod.command.assign.save_failed"));
-            return InteractionResult.FAIL;
-        }
         if (data.ensureResidentAssignment(
-                replacement,
+                building,
                 villager.getUUID(),
                 villager.getName().getString(),
                 player.level().getGameTime()) == null) {
@@ -217,12 +204,12 @@ public final class ResidenceBindingDeviceInteraction {
                     "civilizationmod.command.assign.save_failed"));
             return InteractionResult.FAIL;
         }
-        BuildingResidentService.applyAssignmentVisual(villager, replacement.functionId());
+        BuildingResidentService.applyAssignmentVisual(villager, building.functionId());
         player.sendSystemMessage(CivilizationMessages.translatable(
                 "civilizationmod.binding.bind.success",
-                functionName(replacement.functionId()),
+                functionName(building.functionId()),
                 villager.getName(),
-                replacement.residentCount()));
+                data.countActiveResidents(building)));
         return InteractionResult.SUCCESS;
     }
 

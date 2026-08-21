@@ -449,12 +449,22 @@ public record BuildingObservation(
         return residents.stream().anyMatch(resident -> uuid.equals(resident.uuid()));
     }
 
+    /**
+     * Legacy compatibility helper. New assignments must use ResidentRegistry via
+     * CivilizationWorldData; this roster is retained only for old-world migration.
+     */
+    @Deprecated
     public BuildingObservation withResident(UUID uuid, String name) {
         return withResidents(uuid == null
                 ? List.of()
                 : List.of(new ResidentAssignment(uuid.toString(), name)));
     }
 
+    /**
+     * Legacy compatibility helper. New assignments must use ResidentRegistry via
+     * CivilizationWorldData; this roster is retained only for old-world migration.
+     */
+    @Deprecated
     public BuildingObservation withAddedResident(UUID uuid, String name) {
         if (uuid == null || hasResident(uuid)) {
             return this;
@@ -548,10 +558,20 @@ public record BuildingObservation(
                 this.colonyBindingReason);
     }
 
+    /**
+     * Legacy compatibility helper. New unassignments must use ResidentRegistry via
+     * CivilizationWorldData; this roster is retained only for old-world migration.
+     */
+    @Deprecated
     public BuildingObservation withoutResident() {
         return withResidents(List.of());
     }
 
+    /**
+     * Legacy compatibility helper. New unassignments must use ResidentRegistry via
+     * CivilizationWorldData; this roster is retained only for old-world migration.
+     */
+    @Deprecated
     public BuildingObservation withoutResident(UUID uuid) {
         if (uuid == null) {
             return this;

@@ -58,13 +58,13 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | `residential_marker_4` | 4 | 至少 4 張有效床位，最多 4 名居民 |
 | `residential_marker_6` | 6 | 至少 6 張有效床位，最多 6 名居民 |
 
-住宅支援多名原版 Villager roster。當居民死亡時，server 端會移除其住宅 roster，使容量立即釋放；居民的 Civitas 歷史身份仍會保留，生命週期改為 `dead`。這個死亡事件已完成程式與自動化回歸測試，但仍需要玩家在遊戲內重新驗收。
+住宅支援多名原版 Villager。當居民死亡時，server 端會將 ResidentRecord lifecycle 改為 `dead`；registry-derived 容量立即釋放，而 `BuildingObservation.residents` legacy roster 不再被新生命週期流程寫入。居民的 Civitas 歷史身份仍會保留。這個死亡事件已完成程式與自動化回歸測試，但仍需要玩家在遊戲內重新驗收。
 
 ## 居民資料層
 
 居民資料目前由 `ResidentRecord` 與 `ResidentRegistry` 管理，原版 Villager 只是居民目前的 Minecraft body。`residentId` 是 Civitas 永久邏輯身份；`entityUuid` 是目前 body UUID。未來即使更換居民 body，也只需要更新 `entityUuid`，不必重新建立永久居民身份。
 
-`ResidentRecord` 保存殖民地、住宅建築、工作建築、角色、body type、lifecycle、名稱、建立時間與最近觀測時間。建築關係使用 `dimension@x,y,z` marker key，不使用容易因重掃而改變的一次性 building index。舊版 `BuildingObservation.residents` roster 會在 SavedData 載入後進行相容遷移，並以冪等方式避免重複建立居民。
+`ResidentRecord` 保存殖民地、住宅建築、工作建築、角色、body type、lifecycle、名稱、建立時間與最近觀測時間。建築關係使用 `dimension@x,y,z` marker key，不使用容易因重掃而改變的一次性 building index。`ResidentRegistry` 是 assignment 的唯一 canonical 寫入來源；舊版 `BuildingObservation.residents` 與 `resident_uuid` 只會在 SavedData 載入時作缺漏遷移與相容讀取，既有 registry record 優先，legacy roster 不會再反向覆蓋 assignment。
 
 可使用以下命令查詢居民：
 
@@ -81,13 +81,11 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 | 命令 | 用途 |
 |---|---|
+| `/civitas help` | 顯示目前玩家可用命令與使用方式。 |
 | `/civitas status` | 查詢文明與 SavedData 摘要。 |
-| `/civitas simulate [steps]` | 執行目前保留的聚落食物模擬測試步進。 |
-| `/civitas scan [radius]` | 掃描附近原版村莊聚落。 |
 | `/civitas building scan [radius]` | 掃描附近已載入的 Civitas ItemFrame 建築。 |
 | `/civitas building list` | 列出已登記建築與驗證／殖民地狀態。 |
 | `/civitas building inspect <index>` | 查看指定建築、居民與 storage snapshot。 |
-| `/civitas building generate` | 生成 deterministic 測試用 warehouse 建築。 |
 | `/civitas assign <building_index> [villager]` | 將 Villager 指派至有效 colony-bound 建築。 |
 | `/civitas unassign <building_index> [villager]` | 解除建築與 Villager 的指派關係。 |
 | `/civitas resident list` | 查詢 ResidentRecord 清單。 |
@@ -103,14 +101,14 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 | Fabric 26.2 專案與 Java 25 toolchain | 已完成並可建置 |
 | 世界級 SavedData、schema 與 Codec 相容 | 已完成第一版 |
 | `/civitas` 與 `/civilization` 命令根 | 已完成 |
-| 聚落掃描與食物需求基礎 | 已完成第一版，仍保留 deterministic bootstrap provider |
+| 聚落資料與食物需求基礎 | 已完成第一版資料層；舊版模擬命令不再公開 |
 | Warehouse marker、territory、ItemFrame 建築辨識 | 已完成，物流閉環已通過程式與先前遊戲驗收 |
 | Warehouse storage snapshot 與安全 allowlist 物流 | 已完成第一版 |
 | 27 格 Civitas Villager backpack | 已完成程式、build 與 client smoke 驗證，並已進行先前遊戲驗收 |
 | 1／2／4／6 容量住宅 marker | 已完成程式、容量檢查與多居民 roster |
 | Town Hall core、SavedData 與多核心非重疊範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
 | `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；完整範圍內外遊戲驗收仍待確認 |
-| ResidentRecord／ResidentRegistry | 已完成第一版與 SavedData／Codec 回歸測試 |
+| ResidentRecord／ResidentRegistry | 已完成第一版；已收斂為 assignment 唯一寫入來源並通過 SavedData／Codec 回歸測試 |
 | 村民死亡後釋放住宅容量 | 已完成 server death callback 與回歸測試；等待本次遊戲內重新驗收 |
 | 農田與工作站 | 尚未實作 |
 | 食物實體物流與配送政策 | 尚未實作 |
@@ -120,7 +118,7 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 ## 下一步路線
 
-目前最近完成的是 ResidentRecord／ResidentRegistry 與村民死亡後住宅容量釋放。下一個優先驗收是：在容量為 2 的住宅中綁定兩名村民，殺死其中一名，確認住宅居民數降為 1、死亡居民 lifecycle 變為 `dead`，並確認新村民可以使用釋放的容量。
+目前最近完成的是 ResidentRecord／ResidentRegistry、村民死亡後住宅容量釋放，以及玩家命令樹整理。舊版 settlement／村莊 scan、聚落 simulate 與測試建築 generate 不再作為公開玩家命令；食物模型與測試工具仍保留在程式與自動化驗證層，避免污染目前殖民地主線。下一個優先驗收是：在容量為 2 的住宅中綁定兩名村民，殺死其中一名，確認住宅居民數降為 1、死亡居民 lifecycle 變為 `dead`，並確認新村民可以使用釋放的容量。
 
 通過死亡容量的遊戲內驗收後，將繼續完善居民 lifecycle、移除與 body rebind 規則，再處理住宅居民的床位分配與工作建築關係。自訂 NPC Entity 暫不列入下一個切片，因為目前應先穩定 server SavedData、原版 Villager body、住宅容量與物流閉環。
 
@@ -160,7 +158,7 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 
 ## 測試與驗收
 
-純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、Codec round-trip，以及死亡居民釋放住宅 roster。這些測試不等於完整 Minecraft gameplay；ItemFrame、實際村民死亡事件、SavedData 重開與 GUI 仍需要在遊戲內驗收。[1] [2]
+純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、registry-only assignment／unassign、Codec round-trip，以及死亡居民釋放住宅容量。食物模型與舊聚落資料層仍供回歸測試使用，但其 `/simulate`、`/scan` 與 `/settlement` 公開命令已從命令樹移除。這些測試不等於完整 Minecraft gameplay；ItemFrame、實際村民死亡事件、SavedData 重開、命令 help 畫面與 GUI 仍需要在遊戲內驗收。[1] [2]
 
 死亡容量的最小遊戲內驗收流程如下：
 

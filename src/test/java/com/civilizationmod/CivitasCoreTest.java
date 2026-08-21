@@ -1,7 +1,9 @@
 package com.civilizationmod;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.SharedConstants;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.BeforeAll;
@@ -25,6 +27,24 @@ class CivitasCoreTest {
     static void bootstrapMinecraftRegistries() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+    }
+
+    @Test
+    void publicCommandTreeExposesHelpAndRemovesLegacyCommands() {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        CivilizationCommands.register(dispatcher, null, null);
+
+        assertNotNull(dispatcher.getRoot().getChild("civitas"));
+        assertNotNull(dispatcher.getRoot().getChild("civilization"));
+        assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("help"));
+        assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("building"));
+        assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("townhall"));
+        assertNotNull(dispatcher.getRoot().getChild("civitas").getChild("resident"));
+        assertNull(dispatcher.getRoot().getChild("civitas").getChild("simulate"));
+        assertNull(dispatcher.getRoot().getChild("civitas").getChild("scan"));
+        assertNull(dispatcher.getRoot().getChild("civitas").getChild("settlement"));
+        assertNull(dispatcher.getRoot().getChild("civitas").getChild("sc"));
+        assertNull(dispatcher.getRoot().getChild("civitas").getChild("help").getChild("text"));
     }
 
     @Test
@@ -175,6 +195,50 @@ class CivitasCoreTest {
     }
 
     @Test
+    void newAssignmentWritesRegistryWithoutMutatingLegacyRoster() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                45,
+                70,
+                10,
+                BuildingObservation.STATUS_BOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                450L,
+                450L,
+                "minecraft:overworld",
+                0,
+                70,
+                0)
+                .withResidenceMeasurements(2, 2)
+                .withColonyBinding(
+                        BuildingObservation.STATUS_BOUND,
+                        "minecraft:overworld@townhall-1",
+                        BuildingObservation.COLONY_REASON_BOUND);
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addBuildingObservation(residence));
+        BuildingObservation stored = data.getBuilding(1);
+        assertNotNull(stored);
+        assertEquals(0, stored.residentCount());
+
+        ResidentRecord assigned = data.ensureResidentAssignment(
+                stored,
+                RESIDENT_ONE,
+                "Registry Resident",
+                500L);
+        assertNotNull(assigned);
+        assertEquals(0, data.getBuilding(1).residentCount());
+        assertEquals(1, data.countActiveResidents(data.getBuilding(1)));
+        assertNotNull(data.findBuildingAssignedTo(RESIDENT_ONE.toString()));
+
+        assertTrue(data.clearResidentAssignment(RESIDENT_ONE, 600L));
+        assertEquals(0, data.countActiveResidents(data.getBuilding(1)));
+        assertEquals(0, data.getBuilding(1).residentCount());
+    }
+
+    @Test
     void residentDeathReleasesHomeCapacityButKeepsHistoricalIdentity() {
         BuildingObservation residence = new BuildingObservation(
                 BuildingFunction.RESIDENCE.id(),
@@ -209,8 +273,11 @@ class CivitasCoreTest {
         assertEquals(RESIDENT_ONE.toString(), dead.entityUuid());
         assertEquals(ResidentRecord.LIFECYCLE_DEAD, dead.lifecycle());
         assertEquals("", dead.homeBuildingKey());
-        assertEquals(1, data.getBuilding(1).residentCount());
+        assertEquals(2, data.getBuilding(1).residentCount());
+        assertEquals(1, data.countActiveResidents(data.getBuilding(1)));
         assertTrue(data.getBuilding(1).hasResident(RESIDENT_TWO));
+        assertNull(data.findBuildingAssignedTo(RESIDENT_ONE.toString()));
+        assertNotNull(data.findBuildingAssignedTo(RESIDENT_TWO.toString()));
     }
 
     @Test

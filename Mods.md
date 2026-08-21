@@ -4163,3 +4163,107 @@ README 的 References 使用 Fabric 官方 Saved Data 與 Events 文件，不把
 - [1] Fabric Saved Data：https://docs.fabricmc.net/develop/saved-data
 - [2] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
 - [3] 專案目前程式碼、測試結果與 `Mods.md` 歷史，日期 2026-08-21。
+
+
+## 2026-08-21 — 公開命令整理與 `/civitas help`
+
+### 設計決策
+
+依目前殖民地主線，公開命令樹不再暴露早期文明模擬與測試用命令。已移除 `/civitas settlement`、`/civitas scan`、`/civitas sc`、`/civitas simulate` 與 `/civitas building generate` 的命令註冊。FoodDemandModel、SettlementAdapter 與 deterministic building generator 保留在程式及測試層，作為既有資料模型、回歸測試或未來重新設計的內部能力，但不再被當成目前玩家功能。
+
+新增 `/civitas help`。Help 由 common-side command handler 逐行透過 `CivilizationMessages.translatable(...)` 發送，說明目前仍可用的 status、building、assign、unassign、resident 與 Town Hall 命令；每行都會保留金色品牌前綴。`/civilization help` 由同一個 root builder 自動提供相容版本。Help 只使用 literal，不新增未提供 suggestions 的自由文字參數。
+
+目前公開命令如下：
+
+| 命令 | 狀態 |
+|---|---|
+| `/civitas help` | 新增，顯示使用說明。 |
+| `/civitas status` | 保留，查詢文明與 SavedData 摘要。 |
+| `/civitas building scan/list/inspect` | 保留，服務目前 marker／殖民地主線。 |
+| `/civitas townhall` 與 `townhall radius` | 保留，管理 Town Hall core 與 colony binding。 |
+| `/civitas assign/unassign` | 保留，管理居民建築指派。 |
+| `/civitas resident list` | 保留，查詢 ResidentRecord。 |
+| `/civilization ...` | 保留，作為相容命令根。 |
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：新增 help handler，移除 settlement、早期村莊 scan、sc、simulate 與 building generate 的公開註冊及無用 handler／suggestions。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增英文 help 訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：新增繁體中文 help 訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文 help 訊息。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增命令樹回歸測試，確認 help、building、townhall、resident 存在，舊 simulate／scan／settlement／sc 不存在，且兩個命令根都已註冊。
+- `README.md`：同步目前公開命令表、移除舊命令說明並補充 help 使用方式。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加公開命令整理與 help 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步技能副本。
+- `Mods.md`：追加本次命令整理進度。
+
+### 查證與驗證
+
+- 26.2 Brigadier literal 命令樹沿用現有可編譯的 command registration；help、alias 與動態建築／Town Hall index suggestions 均由既有命令 builder 管理，沒有新增未查證的 command API。
+- `compileJava compileClientJava processResources`：`BUILD SUCCESSFUL`。
+- 三份 locale 使用明確 UTF-8 解析：`en_us.json`、`zh_tw.json`、`zh_cn.json` 均通過 JSON 解析。
+- `test runFoodModelRegressionTest`：`BUILD SUCCESSFUL`；`FoodModelRegressionTest: PASS`，命令樹回歸測試通過。
+- `build`：在 help 實作與 locale 更新後通過，check、jar、assemble 與 sourcesJar 均成功。
+
+### 未完成與下一步
+
+尚未在實際 Minecraft client 中輸入 `/civitas help`、`/civilization help`，也尚未手動確認 help 每一行品牌前綴的顏色、換行與 Tab completion；這是本次唯一尚待遊戲內驗收的命令功能。README 已標示新的公開命令表。下一步先完成 help 遊戲內驗收，再回到居民死亡容量與 Town Hall 多核心範圍的人工驗收。
+
+### 來源
+
+- [1] Fabric Commands 26.2：https://docs.fabricmc.net/develop/commands/basics
+- [2] Fabric Command Arguments 26.2：https://docs.fabricmc.net/develop/commands/arguments
+- [3] 專案現有 `CivilizationMessages`、命令樹 JUnit 與 Gradle build，日期 2026-08-21。
+
+
+## 2026-08-21 — 收斂 ResidentRegistry 與 legacy roster 雙寫資料源
+
+### 根因與架構決策
+
+目前 `BuildingObservation.residents`／`resident_uuid` 與 `ResidentRegistry` 同時保存居民關係，確實存在 assign 一邊成功、另一邊失敗、查詢路徑分叉及除錯時真相不明的風險。本次依架構建議停止加深雙寫：`ResidentRegistry` 現在是所有新居民 assignment 的唯一 canonical 寫入與持久化來源；`BuildingObservation` roster 仍保留於 Codec，只作舊世界遷移與相容讀取。
+
+`CivilizationWorldData.get(...)` 現在只執行冪等 `ResidentRegistry.migrateLegacy(buildings)`。它只把 canonical registry 缺少的 legacy roster assignment 補入 registry，不再呼叫會由 roster 反向覆蓋 canonical assignment 的 `refreshAssignmentsFromBuildings`。既有 ResidentRecord 優先，legacy roster 不會覆蓋 active、cleared 或 dead 居民資料。
+
+### Runtime 行為變更
+
+`/civitas assign`、`/civitas unassign` 與通用 Civitas 綁定裝置不再呼叫 `withResident`、`withAddedResident`、`withoutResident` 或 `replaceBuilding` 來保存居民關係。它們統一透過 `ensureResidentAssignment` 與 `clearResidentAssignment` 寫入 registry；同一個 active entity 若已指向另一個 building key，新的 assignment 會被拒絕。
+
+住宅容量、building inspect 居民名稱、居民導航、warehouse 物流與死亡狀態現在以 registry-derived active assignment 查詢。新增 `countActiveAssignedTo`、`findActiveAssignedTo` 及 WorldData wrappers；死亡居民 lifecycle 為 `dead` 後立即不計入容量。死亡流程不再刪除 legacy roster，避免以新的 lifecycle 再次寫入舊資料源；居民永久身份與歷史 body UUID 仍然保留。
+
+移除 warehouse、住宅或其他已登記 marker 時，`removeBuilding` 與 `removeMissingBuildings` 會透過 `clearAssignmentsForBuilding` 清除 active registry building relationship，但不刪除 ResidentRecord，也不改寫 legacy roster。這避免 marker 消失後 registry 留下失效 building key。
+
+`BuildingObservation` 的 roster mutation helpers 已標記為 legacy compatibility API，要求後續新功能不得使用。建築重掃與 Codec 仍可保留原有 roster 內容以維持舊世界相容；住宅容量 validation 已改用 registry active count，而非 `observation.residentCount()`。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/ResidentRegistry.java`：移除 roster-driven refresh API；新增 active assignment count、查詢與建築關係清除。
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：移除 load-time roster refresh、取消 lookup fallback、加入 registry-only assignment／capacity／building removal 清理，死亡不再寫 roster。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：assign／unassign 改用 registry canonical path；building inspect 的居民與住宅容量改用 active registry records。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：移除 direct roster mutation，綁定與容量訊息改用 registry。
+- `src/main/java/com/civilizationmod/BuildingObservation.java`：legacy roster mutation helpers 加上相容 API 標記與使用限制說明。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增 registry-only assignment／unassign 測試，死亡容量測試改驗證 legacy roster 保持、active registry count 下降及 dead lookup 不再返回建築。
+- `README.md`：同步唯一資料源與 legacy roster 邊界。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加 registry-only 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步 registry-only 規則。
+- `Mods.md`：追加本次架構收斂記錄。
+
+### 查證與驗證
+
+- source audit：production caller 不再呼叫 `withResident`、`withAddedResident`、`withoutResident` 或 `refreshAssignmentsFromBuildings`；這些只剩 BuildingObservation legacy API／測試與遷移相容用途。
+- `gradlew.bat --no-daemon test runFoodModelRegressionTest --console=plain`：`BUILD SUCCESSFUL`；新增 registry-only 測試與既有測試通過，`FoodModelRegressionTest: PASS`。
+- `gradlew.bat --no-daemon build --console=plain`：`BUILD SUCCESSFUL`；compileJava、compileClientJava、resources、check、jar、assemble 均通過。
+- common/server 邊界保持不變；本次沒有新增 client-only 類別或未查證的 Fabric 26.2 API。
+
+### 未完成與風險
+
+舊世界的 legacy roster 欄位仍會保存，這是刻意保留的相容策略，不代表它仍是新功能的寫入真相。若未來要移除欄位，必須先建立舊世界實際載入／重開與 migration telemetry，再另開 schema migration 切片。遊戲內尚未重新驗收：新 assign 不改 roster、住宅容量以 registry 計算、刪除 marker 後 registry assignment 清除，以及死亡後 legacy roster 保持但 active capacity 釋放。
+
+### 下一步
+
+在遊戲內建立一間容量為 2 的住宅並指派兩名村民，執行 `building inspect` 確認容量來自 active registry；解除其中一名後確認容量由 2 降至 1 且 legacy roster 不會造成重複；再殺死一名居民與拆除 marker，分別確認 registry lifecycle／building assignment 正確清理。驗收通過後再進入 body rebind 與完整 resident lifecycle，不要重新引入 roster 雙寫。
+
+### 來源
+
+- [1] Fabric Saved Data：https://docs.fabricmc.net/develop/saved-data
+- [2] Fabric Events 26.2：https://docs.fabricmc.net/develop/events
+- [3] 專案 `ResidentRegistry`、`CivilizationWorldData`、`CivitasCoreTest` 與實際 Gradle build，查證日期 2026-08-21。

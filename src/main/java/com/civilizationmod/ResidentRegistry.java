@@ -131,38 +131,44 @@ public final class ResidentRegistry {
         return added;
     }
 
-    public int refreshAssignmentsFromBuildings(List<BuildingObservation> buildings) {
-        int updated = 0;
-        if (buildings == null) {
+    public int countActiveAssignedTo(String buildingKey) {
+        if (buildingKey == null || buildingKey.isBlank()) {
             return 0;
         }
-        for (BuildingObservation building : buildings) {
-            if (building == null) {
-                continue;
+        int count = 0;
+        for (ResidentRecord resident : residents) {
+            if (resident.isActive() && buildingKey.equals(resident.assignedBuildingKey())) {
+                count++;
             }
-            ResidentRecord.BuildingKey key = ResidentRecord.BuildingKey.from(building);
-            for (BuildingObservation.ResidentAssignment assignment : building.residents()) {
-                ResidentRecord existing = findByEntityUuid(assignment.uuid());
-                if (existing == null) {
-                    existing = findByResidentId(assignment.uuid());
-                }
-                if (existing == null) {
-                    continue;
-                }
-                String role = BuildingFunction.RESIDENCE.id().equals(building.functionId())
-                        ? ResidentRecord.ROLE_RESIDENT
-                        : ResidentRecord.ROLE_WAREHOUSE_WORKER;
-                ResidentRecord refreshed = existing.withAssignment(
-                        key,
-                        building.colonyId(),
-                        role,
-                        building.lastSeen());
-                if (!refreshed.equals(existing) && upsert(refreshed)) {
-                    updated++;
+        }
+        return count;
+    }
+
+    public List<ResidentRecord> findActiveAssignedTo(String buildingKey) {
+        if (buildingKey == null || buildingKey.isBlank()) {
+            return List.of();
+        }
+        return residents.stream()
+                .filter(resident -> resident.isActive() && buildingKey.equals(resident.assignedBuildingKey()))
+                .toList();
+    }
+
+    public int clearAssignmentsForBuilding(String buildingKey, long observedAt) {
+        if (buildingKey == null || buildingKey.isBlank()) {
+            return 0;
+        }
+        int cleared = 0;
+        for (int index = 0; index < residents.size(); index++) {
+            ResidentRecord resident = residents.get(index);
+            if (resident.isActive() && buildingKey.equals(resident.assignedBuildingKey())) {
+                ResidentRecord replacement = resident.withClearedAssignment(observedAt);
+                if (!replacement.equals(resident)) {
+                    residents.set(index, replacement);
+                    cleared++;
                 }
             }
         }
-        return updated;
+        return cleared;
     }
 
     public static ResidentRecord createNew(
