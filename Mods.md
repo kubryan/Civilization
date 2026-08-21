@@ -3535,3 +3535,51 @@ Dedicated server 尚未完成實際啟動驗證，原因是 `run/eula.txt` 尚�
 - [2] https://docs.fabricmc.net/develop/events — Fabric Events 26.2 文件，事件 callback 註冊模式。
 - [3] 專案 `skills/minecraft-civilization-fabric-262/references/building-geometry-26.2.md` — ItemFrame 與 26.2 幾何 API 查證。
 - [4] 本機 Minecraft 26.2 common jar javap：`C:\Users\User\.gradle\caches\fabric-loom\26.2\minecraft-common.jar`，日期 2026-08-21。
+
+
+## 2026-08-21 — 修正 marker 拆除後附魔光效殘留
+
+### 變更
+
+玩家驗收確認：住宅與 warehouse 拆除建築後，server 已正確判定領地無效，但從 ItemFrame 拿下或打掉 marker 時，物品仍保留附魔光效。這是視覺狀態殘留，不是 territory 或 building validation 失敗。
+
+根因是兩條不同的生命週期。marker 仍在 ItemFrame 內但掃描結果變成 invalid 時，既有 `BuildingMarkerVisualState.apply(frame, false)` 可以移除 `ENCHANTMENT_GLINT_OVERRIDE`；然而玩家直接打掉 ItemFrame 後，ItemFrame 在原版掉落流程中即將消失，沒有後續 frame 可供 invalid scan 更新，因此掉落的 ItemStack 會把 glint component 一起帶走。
+
+新增 `BuildingMarkerGlintCleanup` common-side handler，使用 Fabric API `AttackEntityCallback.EVENT` 監聽玩家攻擊 ItemFrame。server 端確認 ItemFrame 內是已知 Civitas marker 後，複製 stack 並只移除 `DataComponents.ENCHANTMENT_GLINT_OVERRIDE`，再寫回 ItemFrame，最後回傳 `PASS`，讓原版繼續完成 ItemFrame 拆除、掉落與 CustomData／warehouse territory 保留。沒有 glint 的 marker、未知物品、client、spectator 或其他實體全部不介入。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/BuildingMarkerGlintCleanup.java`：新增 ItemFrame 拆除前 glint 清理 handler。
+- `src/main/java/com/civilizationmod/CivilizationMod.java`：在 common initializer 註冊 handler。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`、`skills/minecraft-civilization-fabric-262/SKILL.md`、全域 skill：同步記錄根因、26.2 component API、ItemFrame.setItem bytecode 與 callback 邊界。
+- `Mods.md`：追加本次 bug 修正與驗收說明。
+
+### API 查證
+
+本次以實際 Minecraft 26.2 common jar javap 確認 `ItemStack.remove(DataComponentType<? extends T>)` 會回傳被移除的 component，且 `DataComponents.ENCHANTMENT_GLINT_OVERRIDE` 為公開 Boolean component type；以 ItemFrame bytecode 確認 `setItem(ItemStack, boolean)` 的 boolean 只控制紅石鄰居更新，entity data 在兩種呼叫中都會更新，因此不是 client sync 根因。另以實際 Fabric API 0.158.0+26.2 events-interaction jar javap 確認 `AttackEntityCallback.EVENT` 與 `interact(Player, Level, InteractionHand, Entity, EntityHitResult)`。
+
+### 查證與驗證
+
+- 版本：Minecraft Java Edition 26.2、Fabric Loader 0.19.3、Fabric API 0.158.0+26.2、Fabric Loom 1.17.19、Gradle 9.5.1、Java 25。
+- `gradlew.bat --no-daemon runFoodModelRegressionTest compileJava compileClientJava build --console=plain`：`FoodModelRegressionTest: PASS`，`BUILD SUCCESSFUL`。
+- `gradlew.bat --no-daemon runClient --console=plain`：Fabric loader、registry、Render thread、texture atlas 與 client initialization 成功；測試後已停止 client。開發環境 Realms 授權與 run 目錄鎖定訊息沒有造成模組初始化失敗。
+- `git diff --check`：已通過；javap 暫存輸出已清理。
+
+### 未完成與風險
+
+目前自動化驗證已確認 callback 可編譯、註冊與載入，但尚未以完整遊戲操作直接觀察 ItemFrame 掉落物的 tooltip。這需要玩家在遊戲內打掉一個已發光的住宅或 warehouse marker，確認掉落／拿回的物品不再發光，同時確認 warehouse territory 的 CustomData 沒有被清除。
+
+### 遊戲內驗收
+
+先用有效住宅或 warehouse marker 讓 ItemFrame 顯示附魔光效，再直接打掉 ItemFrame。拿起掉落 marker 或查看背包 tooltip，確認附魔光效消失；重新放置同一 marker 後，CustomData 與 warehouse territory 應仍然存在。接著可以故意拆除住宅／warehouse 的必要條件並執行 `/civitas building scan`，確認系統仍判定 invalid，且 ItemFrame 內的 marker 也會移除 glint。
+
+### 下一步
+
+完成這輪視覺修正驗收後，繼續市政廳殖民地歸屬切片：將有效 warehouse／residence 綁定到同維度、核心半徑 64 內的 Town Hall colony ID，並在市政廳不存在或建築超出範圍時標記為未綁定。
+
+### 來源
+
+- [1] https://docs.fabricmc.net/develop/events — Fabric Events 26.2。
+- [2] https://docs.fabricmc.net/develop/items/custom-item-interactions — Fabric Custom Item Interactions 26.2。
+- [3] https://maven.fabricmc.net/docs/fabric-api-0.158.0+26.2/net/fabricmc/fabric/api/event/player/AttackEntityCallback.html — AttackEntityCallback API。
+- [4] 本機 Minecraft 26.2 common jar 與 Fabric API 0.158.0+26.2 jar javap，日期 2026-08-21。

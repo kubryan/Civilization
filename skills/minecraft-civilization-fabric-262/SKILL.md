@@ -513,3 +513,12 @@ Fabric API `fabric-rendering-v1` `25.3.2+515ac5339e` 的實際 sources 已確認
 `TownHallValidator` 只要求 server 已載入且 ItemFrame 透過既有支撐牆公式附著，不套用 warehouse／residence 的門、地板、屋頂、牆體或床位規則。重複核心仍保存 BuildingObservation，但以 `duplicate_town_hall` 受控 reason 標記 invalid。`/civitas townhall` 與相容別名可查詢保存核心；`building scan` 額外回報新增核心與衝突數量。
 
 驗證包含 26.2 common jar javap、Fabric Saved Data 官方文件、TownHallCore Codec／唯一性純 Java regression、Java 25 compile/build、client smoke test 與 dedicated server 初始化；日期 2026-08-21。
+
+
+## 已查證：marker glint 失效與 ItemFrame 拆除前清理（2026-08-21）
+
+Minecraft 26.2 common jar 的 javap 確認 `ItemStack.remove(DataComponentType<? extends T>)` 會回傳被移除的 component，`DataComponents.ENCHANTMENT_GLINT_OVERRIDE` 是公開 Boolean component type；`ItemFrame.setItem(ItemStack)` 委派 `setItem(ItemStack, true)`，雙參數 boolean 只控制紅石鄰居更新，entity data 仍會更新。因此 invalid marker 仍在 ItemFrame 時可由既有 `BuildingMarkerVisualState.apply(frame, false)` 移除 glint；玩家直接打掉 ItemFrame 時則因 frame 已消失而沒有 invalid path，掉落 stack 會保留 glint。
+
+採用 Fabric API 0.158.0+26.2 的 `AttackEntityCallback.EVENT` server-side handler，在原版移除 ItemFrame 與掉落前，複製已知 Civitas marker stack，只移除 `ENCHANTMENT_GLINT_OVERRIDE`，以 `frame.setItem(updated, false)` 寫回，最後回傳 `PASS` 保留原版拆除、掉落與 CustomData。非 marker、無 glint、client 或 spectator 一律 PASS。不得取消攻擊、重建 item、清除 `CUSTOM_DATA` 或 territory。
+
+查證來源：本機 26.2 common jar／Fabric API jar javap、Fabric Events 26.2 文件 https://docs.fabricmc.net/develop/events、Custom Item Interactions 26.2 文件 https://docs.fabricmc.net/develop/items/custom-item-interactions；日期 2026-08-21。

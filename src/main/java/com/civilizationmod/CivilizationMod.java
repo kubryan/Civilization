@@ -21,8 +21,10 @@ public class CivilizationMod implements ModInitializer {
             CivilizationItems.initialize();
                     CivitasMenuTypes.initialize();
                     CivitasVillagerInteraction.register();
-                    BuildingDebugInteraction.register();
-									WarehouseMarkerQuickDeploy.register();
+                                        BuildingDebugInteraction.register();
+                    BuildingMarkerGlintCleanup.register();
+															WarehouseMarkerQuickDeploy.register();
+
 					CivitasTerritoryPreviewService.register();
 					BuildingResidentService.register();
 
