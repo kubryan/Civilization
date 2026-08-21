@@ -173,5 +173,15 @@
   "civilizationmod.villager.backpack.title": "村民背包",
   "civilizationmod.villager.backpack.player_inventory": "玩家物品欄",
   "civilizationmod.command.resident.none": "目前沒有已登記的 Civitas 居民。",
-  "civilizationmod.command.resident.entry": "居民 #%1$d：residentId=%2$s，body UUID=%3$s，殖民地=%4$s，住宅=%5$s，工作=%6$s，角色=%7$s，身體=%8$s，生命週期=%9$s，名稱=%10$s"
+  "civilizationmod.command.resident.entry": "居民 #%1$d：residentId=%2$s，body UUID=%3$s，殖民地=%4$s，住宅=%5$s，工作=%6$s，角色=%7$s，身體=%8$s，生命週期=%9$s，名稱=%10$s",
+
+  "civilizationmod.command.help.title": "Civitas 指令說明：",
+  "civilizationmod.command.help.status": "/civitas status：查看文明資料版本、模擬步數、聚落與食物摘要。",
+  "civilizationmod.command.help.building": "/civitas building：列出、掃描或檢查建築；使用 building scan、list、inspect <編號>。",
+  "civilizationmod.command.help.assign": "/civitas assign <建築編號> [村民]：將村民指派到有效且屬於殖民地的建築。",
+  "civilizationmod.command.help.unassign": "/civitas unassign <建築編號> [村民]：解除村民與建築的指派關係。",
+  "civilizationmod.command.help.resident": "/civitas resident list：查看居民永久身份、body UUID、殖民地、建築與生命週期。",
+  "civilizationmod.command.help.townhall": "/civitas townhall：查看市政廳核心；使用 townhall radius <編號> <半徑> 調整範圍。",
+  "civilizationmod.command.help.scan": "/civitas building scan [半徑]：掃描附近的 Civitas 建築標誌與殖民地歸屬。",
+  "civilizationmod.command.help.alias": "所有主要指令也可使用 /civilization 相容命令根；輸入 /civitas help 可再次查看本說明。"
 }

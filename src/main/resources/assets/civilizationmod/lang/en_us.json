@@ -173,5 +173,15 @@
   "civilizationmod.villager.backpack.title": "Villager Backpack",
   "civilizationmod.villager.backpack.player_inventory": "Player Inventory",
   "civilizationmod.command.resident.none": "No Civitas residents are registered.",
-  "civilizationmod.command.resident.entry": "Resident #%1$d: residentId=%2$s, body UUID=%3$s, colony=%4$s, home=%5$s, work=%6$s, role=%7$s, body=%8$s, lifecycle=%9$s, name=%10$s"
+  "civilizationmod.command.resident.entry": "Resident #%1$d: residentId=%2$s, body UUID=%3$s, colony=%4$s, home=%5$s, work=%6$s, role=%7$s, body=%8$s, lifecycle=%9$s, name=%10$s",
+
+  "civilizationmod.command.help.title": "Civitas command help:",
+  "civilizationmod.command.help.status": "/civitas status: view the schema, simulation steps, settlement and food summary.",
+  "civilizationmod.command.help.building": "/civitas building: list, scan or inspect buildings; use building scan, list, inspect <index>.",
+  "civilizationmod.command.help.assign": "/civitas assign <building index> [villager]: assign a villager to a valid building in a Town Hall colony.",
+  "civilizationmod.command.help.unassign": "/civitas unassign <building index> [villager]: remove a villager assignment from a building.",
+  "civilizationmod.command.help.resident": "/civitas resident list: view resident identity, body UUID, colony, buildings and lifecycle.",
+  "civilizationmod.command.help.townhall": "/civitas townhall: view Town Hall cores; use townhall radius <index> <radius> to adjust a range.",
+  "civilizationmod.command.help.scan": "/civitas building scan [radius]: scan nearby Civitas markers and colony binding.",
+  "civilizationmod.command.help.alias": "All main commands also support the /civilization compatibility root; use /civitas help to show this again."
 }
