@@ -3039,3 +3039,38 @@ README 修改為文件內容，沒有新增 Minecraft API 或 Java 程式碼，�
 - [1] [Fabric Events 26.2](https://docs.fabricmc.net/develop/events)
 - [2] [Fabric Rendering API](https://docs.fabricmc.net/develop/rendering)
 - [3] 本機 Fabric API `fabric-rendering-v1-25.3.2+515ac5339e-sources.jar` 的 `LevelRenderContext.java`；查證日期 2026-08-21。
+
+
+## 2026-08-21 — GitHub main non-fast-forward 整合與成功推送
+
+### 變更
+
+使用者執行 `git push -u origin main` 時收到 `non-fast-forward`。經確認，GitHub repository 的 `main` 先前只有獨立建立的 `Initial commit`，而本機則已有 Civitas 開發提交；兩邊都各自新增過 README，因此直接推送無法套用本機歷史。
+
+本次未使用 `force push`。執行 `git pull --rebase origin main`，rebase 在 `README.md` 發生 add/add 衝突；已保留本機完整 Civitas README、模組功能說明、AI 免責聲明與開發規範，並正常完成 rebase。原本的本機提交重新產生為 `84db515 Add Civitas colony building systems` 與 `0f96eee Add residential marker art and territory preview`。
+
+### 影響檔案
+
+- `README.md`：解決遠端初始 README 與本機 Civitas README 的 add/add 衝突，保留完整本機內容。
+- `Mods.md`：記錄本次 Git 歷史整合與推送結果。
+- Git history：本機提交因 rebase 產生新的 commit SHA，但內容保留；遠端 `main` 已接上完整 Civitas 歷史。
+
+### 查證與驗證
+
+| 項目 | 結果 |
+|---|---|
+| `git fetch origin main` | 成功取得遠端 `main`；確認 repository 為 `https://github.com/kubryan/Civilization.git`。 |
+| `git pull --rebase origin main` | README add/add 衝突已解決，rebase 成功完成。 |
+| `git push -u origin main` | 成功；GitHub 回報 `3dfd257..0f96eee main -> main`。 |
+| `git ls-remote origin refs/heads/main` | 回報 `0f96eeecb334dfab9c1359e122501b6d05308631`。 |
+| `git status --short --branch` | 工作樹乾淨，`main...origin/main`，本機與遠端同步。 |
+| `git diff --check` | 通過，沒有 whitespace error。 |
+| force push | 未執行，遠端歷史未被覆蓋。 |
+
+### 未完成與風險
+
+目前 GitHub `main` 已完成同步。Git rebase 改寫了本機先前兩個非遠端 commit 的 SHA，因此後續若其他本機 clone 仍使用舊的 `ef0d7b4` 或 `e9917ec`，需要重新 fetch 並以新的 `84db515`、`0f96eee` 歷史為準；本專案目前工作樹與 `origin/main` 已一致。
+
+### 下一步
+
+回到遊戲內驗收住宅 marker 的床位容量與領地粒子邊界；若未來繼續開發，先以目前已推送的 `main` 為基準建立下一個功能提交，不要重新使用舊的未 rebase commit SHA。
