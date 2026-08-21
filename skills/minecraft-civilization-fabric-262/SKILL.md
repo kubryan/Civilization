@@ -695,3 +695,12 @@ Town Hall colony gate 採用「無核心時過渡、建立核心後嚴格」政�
 - 採用：`resident list` 玩家聊天、世界重開後 `.dat` reload、Villager unload／reload、`removed` lifecycle 與 body rebind 仍需另外人工或 GameTest；未實際驗證前 README／Mods.md 不得宣稱完成。
 - 禁止：不要用 JUnit Codec round-trip 或 `compileJava` 代替 gameplay proof；不要把 GameTest source set 的編譯成功當成 GameTest 實際通過；不要把暫時找不到 entity 當成 removed，因為 chunk unload 不等於死亡或移除。
 - 查證：Fabric 官方 Automated Testing 26.2（https://docs.fabricmc.net/develop/automatic-testing）、本機 Java 25 javap 與 `build` 的 FabricGameTestRunner 實際輸出；日期 2026-08-22。
+
+
+## 已確認：Resident assignment outcome classification（2026-08-22）
+
+當任務涉及 `/civitas assign`、住宅綁定裝置或 ResidentRegistry assignment 時，使用 `CivilizationWorldData.ensureResidentAssignmentResult(...)` 作為 server-side 分類入口。結果必須區分 `CREATED`、`UPDATED`、`ALREADY_ASSIGNED_TO_TARGET`、`ALREADY_ASSIGNED_TO_OTHER_BUILDING` 與 `FAILED`。
+
+`ResidentRegistry` 仍是唯一 canonical assignment 寫入來源。只有 `CREATED` 或 `UPDATED` 代表真正新增／變更，才應呼叫 `setDirty()` 並顯示 success／transition success；同一 `entityUuid` 已經 active 且其 `homeBuildingKey` 或 `workBuildingKey` 等於目標 building key 時，必須回傳 `ALREADY_ASSIGNED_TO_TARGET`，不改資料、不增加 active count，也不可顯示成功綁定訊息。若 active record 已有不同的 assigned building key，必須回傳 `ALREADY_ASSIGNED_TO_OTHER_BUILDING`，維持跨建築拒絕。
+
+`/civitas assign` 與 `ResidenceBindingDeviceInteraction` 必須共用此 outcome 分類，並透過三份 locale 顯示「已是此建築居民」或「已被指派到其他建築」。舊的 nullable `ensureResidentAssignment(...)` 可保留作相容 wrapper，但新玩家入口不能只依 `ResidentRecord`／`upsert` nullable 或 boolean 結果推測新增與 no-op。`CivitasCoreTest` 與 Fabric 26.2 server `ResidentRecordGameTest` 應各自覆蓋同目標重複 assignment 且 active count 不變。

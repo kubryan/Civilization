@@ -743,28 +743,47 @@ public final class CivilizationCommands {
                                                         }
                 }
 
-                ResidentRecord resident = data.ensureResidentAssignment(
-                        building,
-
-                        villager.getUUID(),
-                        villager.getName().getString(),
-                        source.getServer().getTickCount());
-                if (resident == null) {
+                                CivilizationWorldData.ResidentAssignmentResult assignment =
+                        data.ensureResidentAssignmentResult(
+                                building,
+                                villager.getUUID(),
+                                villager.getName().getString(),
+                                source.getServer().getTickCount());
+                if (assignment.status()
+                        == CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET) {
+                        int currentResidentCount = data.countActiveResidents(building);
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.already_assigned_target",
+                                villager.getName(),
+                                index,
+                                currentResidentCount), false);
+                        return 1;
+                }
+                if (assignment.status()
+                        == CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_OTHER_BUILDING) {
+                        source.sendSuccess(() -> CivilizationMessages.translatable(
+                                "civilizationmod.command.assign.already_assigned_unknown"), false);
+                        return 0;
+                }
+                if (!assignment.isAccepted() || assignment.resident() == null) {
                         source.sendSuccess(() -> CivilizationMessages.translatable(
                                 "civilizationmod.command.assign.save_failed"), false);
                         return 0;
                 }
                 BuildingResidentService.applyAssignmentVisual(villager, building.functionId());
-                                String successKey = data.isTownHallTransitionAllowed(building)
+                String successKey = data.isTownHallTransitionAllowed(building)
                         ? "civilizationmod.command.assign.success.transition"
                         : "civilizationmod.command.assign.success";
+                int currentResidentCount = data.countActiveResidents(building);
                 source.sendSuccess(() -> CivilizationMessages.translatable(
                         successKey,
                         index,
                         villager.getName(),
-                        villager.getStringUUID()), false);
+                        villager.getStringUUID(),
+                        currentResidentCount), false);
 
                 return 1;
+
         }
 
         private static int unassignResident(CommandSourceStack source, int index, Entity explicitTarget)

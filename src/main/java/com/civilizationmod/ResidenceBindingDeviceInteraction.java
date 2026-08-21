@@ -194,11 +194,28 @@ public final class ResidenceBindingDeviceInteraction {
             return InteractionResult.FAIL;
         }
 
-        if (data.ensureResidentAssignment(
-                building,
-                villager.getUUID(),
-                villager.getName().getString(),
-                player.level().getGameTime()) == null) {
+        CivilizationWorldData.ResidentAssignmentResult assignment =
+                data.ensureResidentAssignmentResult(
+                        building,
+                        villager.getUUID(),
+                        villager.getName().getString(),
+                        player.level().getGameTime());
+        if (assignment.status()
+                == CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET) {
+            player.sendSystemMessage(CivilizationMessages.translatable(
+                    "civilizationmod.binding.bind.already_assigned",
+                    villager.getName(),
+                    functionName(building.functionId()),
+                    data.countActiveResidents(building)));
+            return InteractionResult.SUCCESS;
+        }
+        if (assignment.status()
+                == CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_OTHER_BUILDING) {
+            player.sendSystemMessage(CivilizationMessages.translatable(
+                    "civilizationmod.binding.bind.already_assigned_unknown"));
+            return InteractionResult.FAIL;
+        }
+        if (!assignment.isAccepted() || assignment.resident() == null) {
             player.sendSystemMessage(CivilizationMessages.translatable(
                     "civilizationmod.command.assign.save_failed"));
             return InteractionResult.FAIL;

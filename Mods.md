@@ -4476,3 +4476,49 @@ All 2 required tests passed :)
 ### 來源
 
 [1] [Fabric Automated Testing 26.2](https://docs.fabricmc.net/develop/automatic-testing)
+
+
+## 2026-08-22 — 修正居民重複綁定成功訊息與 assignment outcome 分類
+
+### 變更
+
+修正同一 Villager 在重開世界後重複綁定到同一住宅時仍反覆顯示「已綁定成功」的問題。根因不是 `ResidentRegistry` 會新增多筆居民，而是 `CivilizationWorldData.ensureResidentAssignment(...)` 只回傳 nullable `ResidentRecord`，無法讓命令與綁定裝置區分「真正新增／變更」和「同一目標的 idempotent no-op」。
+
+新增 `ResidentAssignmentStatus` 與 `ResidentAssignmentResult`，由 `ensureResidentAssignmentResult(...)` 在 canonical registry write path 分類：第一次綁定為 `CREATED`，實際變更為 `UPDATED`，同一 active `entityUuid` 已經位於目標 `homeBuildingKey`／`workBuildingKey` 為 `ALREADY_ASSIGNED_TO_TARGET`，已在其他建築則為 `ALREADY_ASSIGNED_TO_OTHER_BUILDING`，資料無法建立或保存則為 `FAILED`。同目標 no-op 不會呼叫 `setDirty()`、不會增加 registry-derived active count，也不會顯示成功綁定訊息。
+
+`/civitas assign` 與 `ResidenceBindingDeviceInteraction` 現在共用 outcome 分類。命令和綁定裝置都會對同一建築顯示「已是此建築居民」提示；跨建築仍拒絕；只有 `CREATED`／`UPDATED` 才顯示 success 或 transition success。命令成功訊息同步顯示實際目前居民數。舊 `ensureResidentAssignment(...)` 保留為相容 wrapper，既有 GameTest／service 不需立即改寫。
+
+### 影響檔案
+
+- `src/main/java/com/civilizationmod/CivilizationWorldData.java`：加入 assignment status／result 與分類式 server API。
+- `src/main/java/com/civilizationmod/CivilizationCommands.java`：改用 outcome，分流同目標 no-op、跨建築衝突與真正成功。
+- `src/main/java/com/civilizationmod/ResidenceBindingDeviceInteraction.java`：同步使用相同 outcome，避免綁定裝置仍誤報成功。
+- `src/main/resources/assets/civilizationmod/lang/en_us.json`：新增 no-op／衝突訊息，success 加入目前居民數。
+- `src/main/resources/assets/civilizationmod/lang/zh_tw.json`：同步繁體中文訊息。
+- `src/main/resources/assets/civilizationmod/lang/zh_cn.json`：依專案政策同步繁體中文訊息。
+- `src/test/java/com/civilizationmod/CivitasCoreTest.java`：新增同一居民同一住宅重複 assignment 的 no-op 回歸測試。
+- `src/gametest/java/com/civilizationmod/ResidentRecordGameTest.java`：在真實 Fabric 26.2 server 中新增重複 assignment 不增加容量的 GameTest 驗證。
+- `README.md`：同步 assignment outcome、驗證分層、人工驗收預期與目前狀態。
+- `.cursor/skills/civitas-fabric-262/SKILL.md`：追加可重用 assignment outcome 規則。
+- `skills/minecraft-civilization-fabric-262/SKILL.md`：同步專案 skill 規則。
+- `Mods.md`：追加本次正式進度記錄。
+
+### 版本與 API 邊界
+
+本次只使用既有 common/server Java API 與專案內 `ResidentRegistry`／`SavedData` 路徑，沒有新增未查證的 Fabric 26.2 API、Mixin、networking 或 client-only 類別；不涉及 schema 欄位變更，因此沒有提升 `CURRENT_SCHEMA_VERSION` 的必要。ResidentRegistry 仍是唯一 canonical assignment 寫入來源，legacy roster 沒有新增寫入。
+
+### 查證與驗證
+
+| 命令 | 結果 |
+|---|---|
+| `C:\\Minecraft\\gradlew.bat --no-daemon test --console=plain` | `BUILD SUCCESSFUL`；新增 JUnit no-op 測試通過。 |
+| `C:\\Minecraft\\gradlew.bat --no-daemon runGameTest --console=plain` | `BUILD SUCCESSFUL`；Fabric 26.2 server 啟動，2 個 required tests 通過，包含 duplicate assignment no-op 與死亡容量流程。 |
+| `C:\\Minecraft\\gradlew.bat --no-daemon build --console=plain` | `BUILD SUCCESSFUL`；common、client、resources、JUnit、FoodModel regression、GameTest、jar 均通過。 |
+
+### 未完成與風險
+
+目前自動化測試已證明 server-side outcome 與 registry-derived count 正確，但尚未由玩家在一般世界直接驗收 `/civitas assign` 聊天輸出、綁定裝置重複右鍵的聊天輸出，以及實際重開世界後的命令畫面。`resident_registry` 跨獨立 server session 的 `.dat` 直接讀取、Villager chunk unload／reload lookup、`removed` lifecycle 與 body rebind policy 仍維持未完成或待人工驗收狀態。
+
+### 下一步
+
+啟動 `runClient`，在同一個已綁定住宅中對同一名 Villager 重複執行 `/civitas assign <building_index>`，再使用綁定裝置重複右鍵一次。第一次應顯示真正成功與目前居民數；第二次應顯示「已是此住宅居民」類提示，居民數保持不變。再退出並重新進入世界重複測試，確認 registry 載入後不會重新顯示成功綁定。

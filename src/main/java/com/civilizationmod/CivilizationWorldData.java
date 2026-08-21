@@ -463,25 +463,68 @@ public final class CivilizationWorldData extends SavedData {
                 .orElse(null);
     }
 
-    public ResidentRecord ensureResidentAssignment(
+    public enum ResidentAssignmentStatus {
+        CREATED,
+        UPDATED,
+        ALREADY_ASSIGNED_TO_TARGET,
+        ALREADY_ASSIGNED_TO_OTHER_BUILDING,
+        FAILED
+    }
+
+    public record ResidentAssignmentResult(
+            ResidentAssignmentStatus status,
+            ResidentRecord resident,
+            ResidentRecord existing
+    ) {
+        public boolean isAccepted() {
+            return status == ResidentAssignmentStatus.CREATED
+                    || status == ResidentAssignmentStatus.UPDATED
+                    || status == ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET;
+        }
+
+        public boolean changed() {
+            return status == ResidentAssignmentStatus.CREATED
+                    || status == ResidentAssignmentStatus.UPDATED;
+        }
+    }
+
+    /**
+     * Classifies an assignment before persisting it so callers can distinguish a
+     * real change from an idempotent repeat bind. The registry remains the only
+     * canonical assignment write path.
+     */
+    public ResidentAssignmentResult ensureResidentAssignmentResult(
             BuildingObservation building,
             java.util.UUID entityUuid,
             String name,
             long observedAt
     ) {
         if (building == null || entityUuid == null) {
-            return null;
+            return new ResidentAssignmentResult(
+                    ResidentAssignmentStatus.FAILED,
+                    null,
+                    null);
         }
         String role = BuildingFunction.RESIDENCE.id().equals(building.functionId())
                 ? ResidentRecord.ROLE_RESIDENT
                 : ResidentRecord.ROLE_WAREHOUSE_WORKER;
         ResidentRecord.BuildingKey targetKey = ResidentRecord.BuildingKey.from(building);
+        String targetKeyValue = targetKey.serialize();
         ResidentRecord current = this.residentRegistry.findByEntityUuid(entityUuid);
-        if (current != null
-                && current.isActive()
-                && !current.assignedBuildingKey().isBlank()
-                && !current.assignedBuildingKey().equals(targetKey.serialize())) {
-            return null;
+        if (current != null && current.isActive()) {
+            if (targetKeyValue.equals(current.assignedBuildingKey())
+                    || current.isAssignedTo(targetKey)) {
+                return new ResidentAssignmentResult(
+                        ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET,
+                        current,
+                        current);
+            }
+            if (!current.assignedBuildingKey().isBlank()) {
+                return new ResidentAssignmentResult(
+                        ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_OTHER_BUILDING,
+                        null,
+                        current);
+            }
         }
         ResidentRecord replacement = current == null
                 ? ResidentRegistry.createNew(entityUuid, building, role, name, observedAt)
@@ -491,10 +534,35 @@ public final class CivilizationWorldData extends SavedData {
                         role,
                         observedAt);
         if (replacement == null || !this.residentRegistry.upsert(replacement)) {
-            return null;
+            return new ResidentAssignmentResult(
+                    ResidentAssignmentStatus.FAILED,
+                    null,
+                    current);
         }
         this.setDirty();
-        return replacement;
+        ResidentAssignmentStatus status = current == null
+                ? ResidentAssignmentStatus.CREATED
+                : ResidentAssignmentStatus.UPDATED;
+        return new ResidentAssignmentResult(status, replacement, current);
+    }
+
+    /**
+     * Compatibility helper for existing server tests and services. New player
+     * entrypoints should use {@link #ensureResidentAssignmentResult} when their
+     * message depends on whether the assignment actually changed.
+     */
+    public ResidentRecord ensureResidentAssignment(
+            BuildingObservation building,
+            java.util.UUID entityUuid,
+            String name,
+            long observedAt
+    ) {
+        ResidentAssignmentResult result = ensureResidentAssignmentResult(
+                building,
+                entityUuid,
+                name,
+                observedAt);
+        return result.isAccepted() ? result.resident() : null;
     }
 
     public int countActiveResidents(BuildingObservation building) {

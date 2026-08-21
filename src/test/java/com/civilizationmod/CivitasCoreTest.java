@@ -239,6 +239,60 @@ class CivitasCoreTest {
     }
 
     @Test
+    void repeatedAssignmentToSameBuildingIsIdempotentAndNotReportedAsChanged() {
+        BuildingObservation residence = new BuildingObservation(
+                BuildingFunction.RESIDENCE.id(),
+                "minecraft:overworld",
+                45,
+                70,
+                10,
+                BuildingObservation.STATUS_BOUND,
+                BuildingObservation.VALIDATION_VALID,
+                BuildingObservation.VALIDATION_REASON_VALID,
+                450L,
+                450L,
+                "minecraft:overworld",
+                0,
+                70,
+                0)
+                .withResidenceMeasurements(2, 2)
+                .withColonyBinding(
+                        BuildingObservation.STATUS_BOUND,
+                        "minecraft:overworld@townhall-1",
+                        BuildingObservation.COLONY_REASON_BOUND);
+
+        CivilizationWorldData data = new CivilizationWorldData();
+        assertTrue(data.addBuildingObservation(residence));
+        BuildingObservation stored = data.getBuilding(1);
+
+        CivilizationWorldData.ResidentAssignmentResult first =
+                data.ensureResidentAssignmentResult(
+                        stored,
+                        RESIDENT_ONE,
+                        "Registry Resident",
+                        500L);
+        assertEquals(
+                CivilizationWorldData.ResidentAssignmentStatus.CREATED,
+                first.status());
+        assertTrue(first.changed());
+        assertEquals(1, data.countActiveResidents(stored));
+
+        CivilizationWorldData.ResidentAssignmentResult repeated =
+                data.ensureResidentAssignmentResult(
+                        stored,
+                        RESIDENT_ONE,
+                        "Registry Resident",
+                        600L);
+        assertEquals(
+                CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET,
+                repeated.status());
+        assertFalse(repeated.changed());
+        assertEquals(first.resident().residentId(), repeated.resident().residentId());
+        assertEquals(1, data.countActiveResidents(stored));
+        assertEquals(0, data.getBuilding(1).residentCount());
+    }
+
+    @Test
     void residentDeathReleasesHomeCapacityButKeepsHistoricalIdentity() {
         BuildingObservation residence = new BuildingObservation(
                 BuildingFunction.RESIDENCE.id(),

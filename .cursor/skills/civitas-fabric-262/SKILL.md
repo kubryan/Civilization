@@ -591,3 +591,15 @@ Civitas 目前公開命令樹只保留殖民地主線：`help`、`status`、`bui
 - 採用：`resident list` 玩家聊天、世界重開後 `.dat` reload、Villager unload／reload、`removed` lifecycle 與 body rebind 仍需另外人工或 GameTest；未實際驗證前 README／Mods.md 不得宣稱完成。
 - 禁止：不要用 JUnit Codec round-trip 或 `compileJava` 代替 gameplay proof；不要把 GameTest source set 的編譯成功當成 GameTest 實際通過；不要把暫時找不到 entity 當成 removed，因為 chunk unload 不等於死亡或移除。
 - 查證：Fabric 官方 Automated Testing 26.2（https://docs.fabricmc.net/develop/automatic-testing）、本機 Java 25 javap 與 `build` 的 FabricGameTestRunner 實際輸出；日期 2026-08-22。
+
+
+## 2026-08-22 — Resident assignment outcome classification
+
+- 任務：避免同一村民重複綁定到同一建築時仍顯示成功。
+- 已確認：`CivilizationWorldData.ensureResidentAssignmentResult(...)` 是 server-side assignment 的分類入口；`ResidentAssignmentStatus` 必須區分 `CREATED`、`UPDATED`、`ALREADY_ASSIGNED_TO_TARGET`、`ALREADY_ASSIGNED_TO_OTHER_BUILDING` 與 `FAILED`。
+- 採用：`ResidentRegistry` 仍是唯一 canonical assignment 寫入來源。只有 `CREATED` 或 `UPDATED` 會呼叫 `setDirty()` 並讓玩家看到成功綁定訊息；同一 `entityUuid` 已經 active 且其 `homeBuildingKey` 或 `workBuildingKey` 等於目標 key 時，回傳 `ALREADY_ASSIGNED_TO_TARGET`，不改資料、不增加 active count、不顯示成功訊息。
+- 採用：`/civitas assign` 與 `ResidenceBindingDeviceInteraction` 必須共用此結果分類。`ALREADY_ASSIGNED_TO_TARGET` 顯示「已是此建築居民」；`ALREADY_ASSIGNED_TO_OTHER_BUILDING` 顯示既有其他建築指派；只有實際新增或變更才顯示 success／transition success 與目前居民數。
+- 相容性：舊的 `ensureResidentAssignment(...)` 保留為 wrapper，供既有 server test／service 使用；需要判斷訊息語義的新玩家入口不得依賴 nullable `ResidentRecord` 推測結果。
+- 禁止：不可僅以 `upsert(...)` 回傳 `true` 判斷「新增」；`upsert` 的 true 可能代表替換、而且不能區分同目標 no-op。不可讓 roster count 取代 registry-derived active count。
+- 查證：本專案 `CivitasCoreTest` 與 Fabric 26.2 server `ResidentRecordGameTest` 均已加入同目標重複 assignment 回歸案例；驗證日期 2026-08-22。
+

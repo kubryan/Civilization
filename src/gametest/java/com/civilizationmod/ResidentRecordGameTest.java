@@ -87,6 +87,24 @@ public final class ResidentRecordGameTest implements CustomTestMethodInvoker {
                 data.countActiveResidents(assignedBuilding),
                 "active residential capacity must include the assigned body");
 
+        CivilizationWorldData.ResidentAssignmentResult repeated =
+                data.ensureResidentAssignmentResult(
+                        assignedBuilding,
+                        villager.getUUID(),
+                        TEST_RESIDENT_NAME,
+                        level.getGameTime());
+        helper.assertValueEqual(
+                CivilizationWorldData.ResidentAssignmentStatus.ALREADY_ASSIGNED_TO_TARGET,
+                repeated.status(),
+                "repeating the same assignment must be classified as an idempotent no-op");
+        helper.assertTrue(
+                !repeated.changed(),
+                "repeating the same assignment must not be classified as changed");
+        helper.assertValueEqual(
+                1,
+                data.countActiveResidents(assignedBuilding),
+                "repeating the same assignment must not increase active capacity usage");
+
         ResidentRecord savedRecord = data.getResidentRegistry().findByResidentId(assigned.residentId());
         helper.assertTrue(savedRecord != null, "ResidentRecord must be present in world SavedData object");
         helper.assertValueEqual(

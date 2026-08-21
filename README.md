@@ -68,6 +68,8 @@ Town Hall 是目前殖民地建設主線的核心建築。市政廳 marker 放�
 
 `ResidentRecord` 保存殖民地、住宅建築、工作建築、角色、body type、lifecycle、名稱、建立時間與最近觀測時間。建築關係使用 `dimension@x,y,z` marker key，不使用容易因重掃而改變的一次性 building index。`ResidentRegistry` 是 assignment 的唯一 canonical 寫入來源；舊版 `BuildingObservation.residents` 與 `resident_uuid` 只會在 SavedData 載入時作缺漏遷移與相容讀取，既有 registry record 優先，legacy roster 不會再反向覆蓋 assignment。
 
+assignment 現在使用 server-side outcome 分類：第一次綁定為 `CREATED`，實際改變為 `UPDATED`，同一 `entityUuid` 已經是同一住宅／建築居民則為 `ALREADY_ASSIGNED_TO_TARGET`，不會重複寫入、不會增加 active count，也不會顯示成功綁定訊息；若已在其他建築，則維持跨建築拒絕。`/civitas assign` 與 Civitas 綁定裝置共用這套分類，只有真正新增或變更才顯示 success 與目前居民數。
+
 可使用以下命令查詢居民：
 
 ```text
@@ -83,8 +85,8 @@ ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 
 
 | 驗證項目 | 目前證據 | 狀態 |
 |---|---|---|
-| Codec、legacy migration、registry-only assignment、容量計算 | `CivitasCoreTest` JUnit | 已通過資料層測試 |
-| 實際 server world 內建立 Villager body、entity UUID lookup、assignment 與死亡 callback | Fabric 26.2 server GameTest | 已通過 server gameplay test |
+| Codec、legacy migration、registry-only assignment、容量計算、同目標重複綁定 no-op | `CivitasCoreTest` JUnit | 已通過資料層測試 |
+| 實際 server world 內建立 Villager body、entity UUID lookup、assignment、同目標重複綁定 no-op 與死亡 callback | Fabric 26.2 server GameTest | 已通過 server gameplay test |
 | `/civitas resident list` 玩家聊天輸出 | 命令已註冊，但尚未由玩家人工執行 | 待遊戲內驗收 |
 | `resident_registry` 真正寫入世界 `.dat` 並由另一個 server session reload | 目前未直接檢查 `.dat` 檔案或跨 session reload | 待驗收 |
 | Villager body 暫時 unload 後重新載入的 lookup | 目前只驗證 body 在實際 server world 已載入時可 lookup | 待 GameTest／人工驗收 |
@@ -125,7 +127,7 @@ ResidentRecord 目前不能只以「編譯成功」或 JUnit 通過宣稱完整 
 | 1／2／4／6 容量住宅 marker | 已完成程式、容量檢查與多居民 roster |
 | Town Hall core、SavedData 與多核心非重疊軸對齊立方範圍 | 已完成程式與初始遊戲驗收；多核心完整手動驗收仍待確認 |
 | `colony_id` 建築歸屬切片 | 已完成程式與自動化測試；無 Town Hall 過渡模式已加入，完整範圍內外遊戲驗收仍待確認 |
-| ResidentRecord／ResidentRegistry | 資料層與 registry-only assignment 已完成；server GameTest 已驗證實際 Villager lookup、assignment 與死亡 callback；`resident list` 與重開世界仍待人工驗收 |
+| ResidentRecord／ResidentRegistry | 資料層、registry-only assignment 與重複綁定 no-op 已完成；JUnit 與 server GameTest 已驗證實際 Villager lookup、assignment、同目標重複綁定與死亡 callback；`resident list` 與重開世界仍待人工驗收 |
 | 村民死亡後釋放住宅容量 | 已完成 server death callback、JUnit 與 server GameTest；仍待玩家在一般遊戲世界人工驗收 |
 | 農田與工作站 | 尚未實作 |
 | 食物實體物流與配送政策 | 尚未實作 |
@@ -175,7 +177,7 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 
 ## 測試與驗收
 
-純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、registry-only assignment／unassign、Codec round-trip，以及死亡居民釋放住宅容量。食物模型與舊聚落資料層仍供回歸測試使用，但其 `/simulate`、`/scan` 與 `/settlement` 公開命令已從命令樹移除。這些測試不等於完整 Minecraft gameplay；ItemFrame、實際村民死亡事件、SavedData 重開、命令 help 畫面與 GUI 仍需要在遊戲內驗收。[1] [2]
+純 Java／JUnit 測試目前涵蓋 FoodDemandModel、SettlementAdapter、BuildingObservation、住宅 roster、Town Hall 唯一性與範圍、colony binding、ResidentRegistry migration、雙 UUID、registry-only assignment／unassign、同一村民同一建築的 idempotent duplicate assignment、Codec round-trip，以及死亡居民釋放住宅容量。Fabric 26.2 server GameTest 另外驗證真實 Villager body、UUID lookup、assignment、同目標重複綁定不增加容量與死亡 callback。食物模型與舊聚落資料層仍供回歸測試使用，但其 `/simulate`、`/scan` 與 `/settlement` 公開命令已從命令樹移除。這些自動化測試仍不等於完整玩家 gameplay；ItemFrame、實際 `/civitas assign`／綁定裝置聊天輸出、SavedData 跨 session 重開、命令 help 畫面與 GUI 仍需要在遊戲內驗收。[1] [2]
 
 死亡容量的最小遊戲內驗收流程如下：
 
@@ -197,7 +199,7 @@ Windows 開發環境需要安裝 JDK 25。從 `C:\Minecraft` 專案根目錄執�
 /civitas resident list
 ```
 
-預期住宅居民數量下降一名，死亡居民仍出現在列表中且 lifecycle 為 `dead`。之後重新指派一名 Villager，確認釋放的容量可以再次使用。
+預期住宅居民數量下降一名，死亡居民仍出現在列表中且 lifecycle 為 `dead`。之後重新指派一名 Villager，確認釋放的容量可以再次使用。對已綁定的同一名 Villager 再執行一次 `/civitas assign` 或使用綁定裝置重複右鍵時，預期顯示「已是此住宅居民」類提示，而不是再次顯示成功綁定；居民數應維持不變。
 
 ## 專案規則與研究文件
 
